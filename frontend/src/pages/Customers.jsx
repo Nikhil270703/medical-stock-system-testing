@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { validateCustomerForm, formatMobileInput, formatNumberInput, sanitizeText } from '../utils/validation';
 
 export default function Customers() {
   const [customers, setCustomers] = useState([]);
@@ -10,6 +11,7 @@ export default function Customers() {
   // Form State
   const [formMode, setFormMode] = useState(null); // 'add' | 'edit' | null
   const [formData, setFormData] = useState({ name: '', mobile: '', address: '', gstNumber: '', notes: '', defaultRecurringDays: '', creditLimit: '', password: '' });
+  const [touched, setTouched] = useState({});
   const [selectedId, setSelectedId] = useState(null);
 
   // Profile Modal State
@@ -33,8 +35,16 @@ export default function Customers() {
     fetchCustomers();
   }, [search]);
 
+  const formErrors = validateCustomerForm(formData);
+  const isFormValid = !Object.values(formErrors).some(Boolean);
+
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+  };
+
   const handleOpenAdd = () => {
     setFormData({ name: '', mobile: '', address: '', gstNumber: '', notes: '', defaultRecurringDays: '', creditLimit: '', password: '' });
+    setTouched({});
     setFormMode('add');
   };
 
@@ -49,18 +59,32 @@ export default function Customers() {
       creditLimit: customer.creditLimit || '',
       password: ''
     });
+    setTouched({});
     setSelectedId(customer._id);
     setFormMode('edit');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const errors = validateCustomerForm(formData);
+    if (Object.values(errors).some(Boolean)) {
+
+      setTouched({ name: true, mobile: true, address: true, gstNumber: true, defaultRecurringDays: true, creditLimit: true, password: true });
+      return;
+    }
+    const sanitizedData = {
+      ...formData,
+      name: sanitizeText(formData.name),
+      address: sanitizeText(formData.address),
+      gstNumber: formData.gstNumber ? formData.gstNumber.trim().toUpperCase() : '',
+      notes: sanitizeText(formData.notes)
+    };
     try {
       setError('');
       if (formMode === 'add') {
-        await api.post('/customers', formData);
+        await api.post('/customers', sanitizedData);
       } else {
-        await api.put(`/customers/${selectedId}`, formData);
+        await api.put(`/customers/${selectedId}`, sanitizedData);
       }
       setFormMode(null);
       fetchCustomers();
@@ -186,27 +210,39 @@ export default function Customers() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '15px' }}>
           <div style={{ background: '#fff', borderRadius: '12px', padding: '24px', width: '100%', maxWidth: '500px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
             <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#0f172a', marginBottom: '15px' }}>{formMode === 'add' ? 'Add New Customer' : 'Edit Customer'}</h3>
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Customer Name*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Customer Name<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <input 
                   type="text" 
                   value={formData.name} 
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
-                  required
+                  onBlur={() => handleBlur('name')}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.name && formErrors.name ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none' }}
                 />
+                {touched.name && formErrors.name && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.name}</div>
+                )}
               </div>
 
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Mobile Number*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Mobile Number<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <input 
                   type="tel" 
                   value={formData.mobile} 
-                  onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
-                  required
+                  onChange={(e) => setFormData({ ...formData, mobile: formatMobileInput(e.target.value) })}
+                  onBlur={() => handleBlur('mobile')}
+                  placeholder="10-digit mobile number"
+                  maxLength={10}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.mobile && formErrors.mobile ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none' }}
                 />
+                {touched.mobile && formErrors.mobile && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.mobile}</div>
+                )}
               </div>
 
               <div>
@@ -214,21 +250,31 @@ export default function Customers() {
                 <input 
                   type="text" 
                   value={formData.gstNumber} 
-                  onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value })}
-                  placeholder="e.g. 27AAAAA0000A1Z5"
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
+                  onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value.toUpperCase() })}
+                  onBlur={() => handleBlur('gstNumber')}
+                  placeholder="e.g. 27ABCDE1234F1Z5"
+                  maxLength={15}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.gstNumber && formErrors.gstNumber ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none' }}
                 />
+                {touched.gstNumber && formErrors.gstNumber && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.gstNumber}</div>
+                )}
               </div>
 
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Address*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Address<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <textarea 
                   value={formData.address} 
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  onBlur={() => handleBlur('address')}
                   rows="3"
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
-                  required
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.address && formErrors.address ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none' }}
                 />
+                {touched.address && formErrors.address && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.address}</div>
+                )}
               </div>
 
               <div>
@@ -244,25 +290,33 @@ export default function Customers() {
               <div>
                 <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Default Order Loop (Days) - Optional</label>
                 <input 
-                  type="number"
-                  min="0"
+                  type="text"
+                  inputMode="numeric"
                   placeholder="e.g. 30"
                   value={formData.defaultRecurringDays} 
-                  onChange={(e) => setFormData({ ...formData, defaultRecurringDays: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
+                  onChange={(e) => setFormData({ ...formData, defaultRecurringDays: formatNumberInput(e.target.value, false) })}
+                  onBlur={() => handleBlur('defaultRecurringDays')}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.defaultRecurringDays && formErrors.defaultRecurringDays ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none' }}
                 />
+                {touched.defaultRecurringDays && formErrors.defaultRecurringDays && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.defaultRecurringDays}</div>
+                )}
               </div>
 
               <div>
                 <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Credit Limit (Rs.) - Optional</label>
                 <input 
-                  type="number"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
                   placeholder="e.g. 50000"
                   value={formData.creditLimit} 
-                  onChange={(e) => setFormData({ ...formData, creditLimit: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
+                  onChange={(e) => setFormData({ ...formData, creditLimit: formatNumberInput(e.target.value, true) })}
+                  onBlur={() => handleBlur('creditLimit')}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.creditLimit && formErrors.creditLimit ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none' }}
                 />
+                {touched.creditLimit && formErrors.creditLimit && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.creditLimit}</div>
+                )}
               </div>
 
               <div>
@@ -272,8 +326,12 @@ export default function Customers() {
                   placeholder={formMode === 'edit' ? "Leave blank to keep unchanged" : "Set password for customer portal"}
                   value={formData.password} 
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
+                  onBlur={() => handleBlur('password')}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.password && formErrors.password ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none' }}
                 />
+                {touched.password && formErrors.password && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.password}</div>
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
@@ -286,7 +344,8 @@ export default function Customers() {
                 </button>
                 <button 
                   type="submit" 
-                  style={{ flex: 1, padding: '10px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
+                  disabled={!isFormValid}
+                  style={{ flex: 1, padding: '10px', background: isFormValid ? '#3b82f6' : '#94a3b8', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: isFormValid ? 'pointer' : 'not-allowed' }}
                 >
                   Save
                 </button>

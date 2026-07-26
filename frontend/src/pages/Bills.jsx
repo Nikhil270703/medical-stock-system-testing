@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { validateBillPaymentForm, formatNumberInput, sanitizeText } from '../utils/validation';
 
 export default function Bills() {
   const [bills, setBills] = useState([]);
@@ -10,6 +11,7 @@ export default function Bills() {
   const [payModal, setPayModal] = useState(false);
   const [selectedBill, setSelectedBill] = useState(null);
   const [payData, setPayData] = useState({ amountPaid: '', paymentMode: 'UPI', referenceNumber: '', notes: '' });
+  const [touched, setTouched] = useState({});
 
   // WhatsApp Reminder Modal State
   const [reminderModal, setReminderModal] = useState(false);
@@ -33,6 +35,13 @@ export default function Bills() {
     fetchBills();
   }, []);
 
+  const formErrors = validateBillPaymentForm(payData);
+  const isFormValid = !Object.values(formErrors).some(Boolean);
+
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+  };
+
   const handleOpenPaymentModal = (bill) => {
     // calculate remaining unpaid balance
     setSelectedBill(bill);
@@ -42,23 +51,31 @@ export default function Bills() {
       referenceNumber: '',
       notes: ''
     });
+    setTouched({});
     setPayModal(true);
   };
 
   const handleSavePayment = async (e) => {
     e.preventDefault();
+    const errors = validateBillPaymentForm(payData);
+    if (Object.values(errors).some(Boolean)) {
+
+      setTouched({ amountPaid: true });
+      return;
+    }
     try {
       setError('');
       const payload = {
         billId: selectedBill._id,
         amountPaid: Number(payData.amountPaid),
         paymentMode: payData.paymentMode,
-        referenceNumber: payData.referenceNumber,
-        notes: payData.notes
+        referenceNumber: sanitizeText(payData.referenceNumber),
+        notes: sanitizeText(payData.notes)
       };
 
       await api.post('/payments', payload);
       setPayModal(false);
+      setTouched({});
       fetchBills();
     } catch (err) {
       console.error(err);
@@ -241,17 +258,22 @@ export default function Bills() {
             <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#0f172a', marginBottom: '10px' }}>Log Payment Collection</h3>
             <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '15px' }}>Record payment against Invoice {selectedBill?.invoiceNumber}. Total Amount due: Rs. {selectedBill?.totalAmount.toFixed(2)}</p>
             
-            <form onSubmit={handleSavePayment} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <form onSubmit={handleSavePayment} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Amount Paid (Rs.)*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Amount Paid (Rs.)<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <input 
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={payData.amountPaid}
-                  onChange={(e) => setPayData({ ...payData, amountPaid: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
-                  required
+                  onChange={(e) => setPayData({ ...payData, amountPaid: formatNumberInput(e.target.value, true) })}
+                  onBlur={() => handleBlur('amountPaid')}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.amountPaid && formErrors.amountPaid ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none' }}
                 />
+                {touched.amountPaid && formErrors.amountPaid && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.amountPaid}</div>
+                )}
               </div>
 
               <div>
@@ -299,7 +321,8 @@ export default function Bills() {
                 </button>
                 <button 
                   type="submit" 
-                  style={{ flex: 1, padding: '10px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
+                  disabled={!isFormValid}
+                  style={{ flex: 1, padding: '10px', background: isFormValid ? '#10b981' : '#94a3b8', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: isFormValid ? 'pointer' : 'not-allowed' }}
                 >
                   Submit Payment
                 </button>

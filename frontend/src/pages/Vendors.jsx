@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { validateVendorForm, formatMobileInput, formatNumberInput, sanitizeText } from '../utils/validation';
 
 export default function Vendors() {
   const [vendors, setVendors] = useState([]);
@@ -9,6 +10,7 @@ export default function Vendors() {
   // Form State
   const [formMode, setFormMode] = useState(null); // 'add' | 'edit' | null
   const [formData, setFormData] = useState({ name: '', contact: '', address: '', itemCategories: '', performanceScore: 100, qualityRating: 5 });
+  const [touched, setTouched] = useState({});
   const [selectedId, setSelectedId] = useState(null);
 
   const fetchVendors = async () => {
@@ -27,8 +29,16 @@ export default function Vendors() {
     fetchVendors();
   }, []);
 
+  const formErrors = validateVendorForm(formData);
+  const isFormValid = !Object.values(formErrors).some(Boolean);
+
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+  };
+
   const handleOpenAdd = () => {
     setFormData({ name: '', contact: '', address: '', itemCategories: '', performanceScore: 100, qualityRating: 5 });
+    setTouched({});
     setFormMode('add');
   };
 
@@ -41,12 +51,19 @@ export default function Vendors() {
       performanceScore: vendor.performanceScore || 100,
       qualityRating: vendor.qualityRating || 5
     });
+    setTouched({});
     setSelectedId(vendor._id);
     setFormMode('edit');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const errors = validateVendorForm(formData);
+    if (Object.values(errors).some(Boolean)) {
+
+      setTouched({ name: true, contact: true, address: true, performanceScore: true, qualityRating: true });
+      return;
+    }
     try {
       setError('');
       // Convert comma-separated string to array
@@ -56,6 +73,8 @@ export default function Vendors() {
 
       const payload = {
         ...formData,
+        name: sanitizeText(formData.name),
+        address: sanitizeText(formData.address),
         itemCategories: categoriesArray
       };
 
@@ -178,38 +197,55 @@ export default function Vendors() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '15px' }}>
           <div style={{ background: '#fff', borderRadius: '12px', padding: '24px', width: '100%', maxWidth: '500px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
             <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#0f172a', marginBottom: '15px' }}>{formMode === 'add' ? 'Add New Supplier Vendor' : 'Edit Supplier Vendor'}</h3>
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Vendor Name*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Vendor Name<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <input 
                   type="text" 
                   value={formData.name} 
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
-                  required
+                  onBlur={() => handleBlur('name')}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.name && formErrors.name ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none' }}
                 />
+                {touched.name && formErrors.name && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.name}</div>
+                )}
               </div>
 
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Contact Phone/Mobile*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Contact Phone/Mobile<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <input 
-                  type="text" 
+                  type="tel" 
                   value={formData.contact} 
-                  onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
-                  required
+                  onChange={(e) => setFormData({ ...formData, contact: formatMobileInput(e.target.value) })}
+                  onBlur={() => handleBlur('contact')}
+                  placeholder="10-digit mobile number"
+                  maxLength={10}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.contact && formErrors.contact ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none' }}
                 />
+                {touched.contact && formErrors.contact && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.contact}</div>
+                )}
               </div>
 
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Address*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Address<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <textarea 
                   value={formData.address} 
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  onBlur={() => handleBlur('address')}
                   rows="3"
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
-                  required
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.address && formErrors.address ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none' }}
                 />
+                {touched.address && formErrors.address && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.address}</div>
+                )}
               </div>
 
               <div>
@@ -227,24 +263,30 @@ export default function Vendors() {
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Performance Score (0-100)</label>
                   <input 
-                    type="number" 
-                    min="0"
-                    max="100"
+                    type="text" 
+                    inputMode="numeric"
                     value={formData.performanceScore} 
-                    onChange={(e) => setFormData({ ...formData, performanceScore: parseInt(e.target.value) || 0 })}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
+                    onChange={(e) => setFormData({ ...formData, performanceScore: formatNumberInput(e.target.value, false) })}
+                    onBlur={() => handleBlur('performanceScore')}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.performanceScore && formErrors.performanceScore ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none' }}
                   />
+                  {touched.performanceScore && formErrors.performanceScore && (
+                    <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.performanceScore}</div>
+                  )}
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Quality Rating (1-5)</label>
                   <input 
-                    type="number" 
-                    min="1"
-                    max="5"
+                    type="text" 
+                    inputMode="numeric"
                     value={formData.qualityRating} 
-                    onChange={(e) => setFormData({ ...formData, qualityRating: parseInt(e.target.value) || 1 })}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
+                    onChange={(e) => setFormData({ ...formData, qualityRating: formatNumberInput(e.target.value, false) })}
+                    onBlur={() => handleBlur('qualityRating')}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.qualityRating && formErrors.qualityRating ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none' }}
                   />
+                  {touched.qualityRating && formErrors.qualityRating && (
+                    <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.qualityRating}</div>
+                  )}
                 </div>
               </div>
 
@@ -258,7 +300,8 @@ export default function Vendors() {
                 </button>
                 <button 
                   type="submit" 
-                  style={{ flex: 1, padding: '10px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
+                  disabled={!isFormValid}
+                  style={{ flex: 1, padding: '10px', background: isFormValid ? '#3b82f6' : '#94a3b8', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: isFormValid ? 'pointer' : 'not-allowed' }}
                 >
                   Save
                 </button>

@@ -24,6 +24,26 @@ exports.createBranch = async (req, res) => {
     if (!name || !address || !contact) {
       return res.status(400).json({ error: 'Name, address and contact details are required' });
     }
+
+    const normalizedInput = String(name).trim().replace(/\s+/g, ' ');
+    if (!normalizedInput) {
+      return res.status(400).json({ error: 'Branch name cannot be empty' });
+    }
+
+    const tokens = normalizedInput.split(' ').map(token => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const pattern = `^\\s*${tokens.join('\\s+')}\\s*$`;
+
+    const existingBranch = await Branch.findOne({
+      name: { $regex: new RegExp(pattern, 'i') }
+    }).select('_id');
+
+    if (existingBranch) {
+      return res.status(409).json({
+        success: false,
+        message: "Branch already exists."
+      });
+    }
+
     const branch = new Branch({ name, address, contact });
     await branch.save();
     

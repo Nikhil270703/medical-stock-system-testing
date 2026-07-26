@@ -11,6 +11,16 @@ export default function Settings() {
   // Add Branch Form State
   const [showAddBranch, setShowAddBranch] = useState(false);
   const [branchForm, setBranchForm] = useState({ name: '', address: '', contact: '' });
+  const [submittingBranch, setSubmittingBranch] = useState(false);
+  const [modalError, setModalError] = useState('');
+
+  const normalizeBranchName = (str) => {
+    if (typeof str !== 'string') return '';
+    return str.trim().toLowerCase().replace(/\s+/g, ' ');
+  };
+
+  const normalizedBranchInput = normalizeBranchName(branchForm.name);
+  const isBranchDuplicate = normalizedBranchInput !== '' && branches.some(b => normalizeBranchName(b.name) === normalizedBranchInput);
 
   const fetchData = async () => {
     try {
@@ -49,15 +59,27 @@ export default function Settings() {
     e.preventDefault();
     setSuccess('');
     setError('');
+    setModalError('');
+
+    if (isBranchDuplicate) {
+      setModalError("Branch already exists.");
+      return;
+    }
+
+    setSubmittingBranch(true);
     try {
       await api.post('/branches', branchForm);
       setSuccess('New branch registered successfully! ✅');
       setShowAddBranch(false);
       setBranchForm({ name: '', address: '', contact: '' });
+      setModalError('');
       fetchData();
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.error || 'Failed to register branch');
+      const backendMsg = err.response?.data?.message || err.response?.data?.error || 'Failed to register branch';
+      setModalError(backendMsg);
+    } finally {
+      setSubmittingBranch(false);
     }
   };
 
@@ -238,7 +260,7 @@ export default function Settings() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', marginBottom: '15px' }}>
           <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e293b' }}>🏢 Branches</h3>
           <button 
-            onClick={() => setShowAddBranch(true)}
+            onClick={() => { setModalError(''); setBranchForm({ name: '', address: '', contact: '' }); setShowAddBranch(true); }}
             style={{ padding: '8px 16px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', fontSize: '13px' }}
           >
             ➕ Add Branch
@@ -271,16 +293,30 @@ export default function Settings() {
           <div style={{ background: '#fff', borderRadius: '12px', padding: '24px', width: '100%', maxWidth: '400px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
             <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#0f172a', marginBottom: '15px' }}>Add Branch</h3>
             
+            {modalError && (
+              <div style={{ padding: '8px 12px', background: '#fee2e2', border: '1px solid #fca5a5', color: '#b91c1c', borderRadius: '6px', fontSize: '12px', marginBottom: '15px' }}>
+                {modalError}
+              </div>
+            )}
+
             <form onSubmit={handleAddBranchSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <div>
                 <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Branch Name*</label>
                 <input 
                   type="text"
                   value={branchForm.name}
-                  onChange={(e) => setBranchForm({ ...branchForm, name: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  onChange={(e) => {
+                    setBranchForm({ ...branchForm, name: e.target.value });
+                    if (modalError) setModalError('');
+                  }}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: isBranchDuplicate ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none' }}
                   required
                 />
+                {isBranchDuplicate && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
+                    Branch already exists.
+                  </div>
+                )}
               </div>
 
               <div>
@@ -309,15 +345,26 @@ export default function Settings() {
                 <button 
                   type="button" 
                   onClick={() => setShowAddBranch(false)}
-                  style={{ flex: 1, padding: '10px', background: '#e2e8f0', color: '#334155', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
+                  disabled={submittingBranch}
+                  style={{ flex: 1, padding: '10px', background: '#e2e8f0', color: '#334155', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: submittingBranch ? 'not-allowed' : 'pointer' }}
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit" 
-                  style={{ flex: 1, padding: '10px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
+                  disabled={isBranchDuplicate || submittingBranch}
+                  style={{ 
+                    flex: 1, 
+                    padding: '10px', 
+                    background: (isBranchDuplicate || submittingBranch) ? '#94a3b8' : '#3b82f6', 
+                    color: '#fff', 
+                    border: 'none', 
+                    borderRadius: '8px', 
+                    fontWeight: '600', 
+                    cursor: (isBranchDuplicate || submittingBranch) ? 'not-allowed' : 'pointer' 
+                  }}
                 >
-                  Add
+                  {submittingBranch ? 'Adding...' : 'Add'}
                 </button>
               </div>
             </form>

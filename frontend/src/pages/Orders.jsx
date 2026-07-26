@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { validateOrderForm, formatNumberInput } from '../utils/validation';
 
 export default function Orders() {
   const [orders, setOrders] = useState([]);
@@ -21,6 +22,7 @@ export default function Orders() {
   const [orderItems, setOrderItems] = useState([{ product: '', quantity: 1, price: 0 }]);
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurringIntervalDays, setRecurringIntervalDays] = useState(30);
+  const [touched, setTouched] = useState({});
 
   const fetchData = async () => {
     try {
@@ -45,6 +47,14 @@ export default function Orders() {
   useEffect(() => {
     fetchData();
   }, [filterStatus]);
+
+  const formErrors = validateOrderForm(selectedCustomerId, deliveryDate, isRecurring, recurringIntervalDays, orderItems);
+  const isFormValid = !Object.values(formErrors).some(Boolean);
+
+
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+  };
 
   // Leaflet initialization hook for trackingOrder modal location map
   useEffect(() => {
@@ -376,9 +386,11 @@ export default function Orders() {
           <div style={{ background: '#fff', borderRadius: '12px', padding: '24px', width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
             <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#0f172a', marginBottom: '15px' }}>Create New Dispatch Order</h3>
             
-            <form onSubmit={handleSubmitOrder} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <form onSubmit={handleSubmitOrder} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Select Customer*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Select Customer<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <select 
                   value={selectedCustomerId}
                   onChange={(e) => {
@@ -393,25 +405,33 @@ export default function Orders() {
                       setRecurringIntervalDays(30);
                     }
                   }}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none', background: '#fff' }}
-                  required
+                  onBlur={() => handleBlur('customerId')}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.customerId && formErrors.customerId ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none', background: '#fff' }}
                 >
                   <option value="">-- Select customer Profile --</option>
                   {customers.map(c => (
                     <option key={c._id} value={c._id}>{c.name} ({c.mobile})</option>
                   ))}
                 </select>
+                {touched.customerId && formErrors.customerId && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.customerId}</div>
+                )}
               </div>
 
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Scheduled Delivery Date*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Scheduled Delivery Date<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <input 
                   type="date"
                   value={deliveryDate}
                   onChange={(e) => setDeliveryDate(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
-                  required
+                  onBlur={() => handleBlur('deliveryDate')}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.deliveryDate && formErrors.deliveryDate ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none' }}
                 />
+                {touched.deliveryDate && formErrors.deliveryDate && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.deliveryDate}</div>
+                )}
               </div>
 
               <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
@@ -424,16 +444,22 @@ export default function Orders() {
                   Enable Order Loop (Recurring Delivery)
                 </label>
                 {isRecurring && (
-                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px', paddingLeft: '24px' }}>
-                    <label style={{ fontSize: '12px', color: '#475569' }}>Repeat every:</label>
-                    <input 
-                      type="number" 
-                      min="1" 
-                      value={recurringIntervalDays}
-                      onChange={(e) => setRecurringIntervalDays(e.target.value)}
-                      style={{ width: '70px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
-                    />
-                    <span style={{ fontSize: '12px', color: '#475569' }}>days</span>
+                  <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <label style={{ fontSize: '12px', color: '#475569' }}>Repeat every:</label>
+                      <input 
+                        type="text"
+                        inputMode="numeric"
+                        value={recurringIntervalDays}
+                        onChange={(e) => setRecurringIntervalDays(formatNumberInput(e.target.value, false))}
+                        onBlur={() => handleBlur('recurringIntervalDays')}
+                        style={{ width: '70px', padding: '6px 10px', borderRadius: '6px', border: touched.recurringIntervalDays && formErrors.recurringIntervalDays ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none' }}
+                      />
+                      <span style={{ fontSize: '12px', color: '#475569' }}>days</span>
+                    </div>
+                    {touched.recurringIntervalDays && formErrors.recurringIntervalDays && (
+                      <div style={{ color: '#ef4444', fontSize: '11px' }}>{formErrors.recurringIntervalDays}</div>
+                    )}
                   </div>
                 )}
               </div>
@@ -447,8 +473,7 @@ export default function Orders() {
                       <select 
                         value={item.product}
                         onChange={(e) => handleItemProductChange(idx, e.target.value)}
-                        style={{ flex: 2, padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none', background: '#fff' }}
-                        required
+                        style={{ flex: 2, padding: '8px 12px', borderRadius: '6px', border: !item.product && touched.items ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none', background: '#fff' }}
                       >
                         <option value="">Choose Product</option>
                         {products.map(p => (
@@ -457,12 +482,11 @@ export default function Orders() {
                       </select>
 
                       <input 
-                        type="number"
-                        min="1"
+                        type="text"
+                        inputMode="numeric"
                         value={item.quantity}
-                        onChange={(e) => handleItemQtyChange(idx, e.target.value)}
+                        onChange={(e) => handleItemQtyChange(idx, formatNumberInput(e.target.value, false))}
                         style={{ width: '80px', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
-                        required
                       />
 
                       <div style={{ width: '80px', fontSize: '13px', color: '#475569', textAlign: 'right' }}>
@@ -479,6 +503,9 @@ export default function Orders() {
                     </div>
                   ))}
                 </div>
+                {touched.items && formErrors.items && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.items}</div>
+                )}
                 <button 
                   type="button" 
                   onClick={handleAddItemRow}
@@ -504,7 +531,8 @@ export default function Orders() {
                 </button>
                 <button 
                   type="submit" 
-                  style={{ flex: 1, padding: '10px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
+                  disabled={!isFormValid}
+                  style={{ flex: 1, padding: '10px', background: isFormValid ? '#3b82f6' : '#94a3b8', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: isFormValid ? 'pointer' : 'not-allowed' }}
                 >
                   Confirm Order
                 </button>

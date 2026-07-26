@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { validateText, validateNumber, formatNumberInput } from '../utils/validation';
 
 export default function CustomerOrderBook({ user, onNavigate }) {
   const [products, setProducts] = useState([]);
@@ -13,6 +14,7 @@ export default function CustomerOrderBook({ user, onNavigate }) {
   const [deliveryDate, setDeliveryDate] = useState('');
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurringDays, setRecurringDays] = useState(30);
+  const [touched, setTouched] = useState({});
 
   useEffect(() => {
     fetchProducts();
@@ -32,6 +34,23 @@ export default function CustomerOrderBook({ user, onNavigate }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getFormErrors = () => {
+    const errs = {
+      deliveryDate: validateText(deliveryDate, { required: true, fieldName: 'Delivery Date' })
+    };
+    if (isRecurring) {
+      errs.recurringDays = validateNumber(recurringDays, { required: true, min: 1, allowDecimal: false, fieldName: 'Recurring Days' });
+    }
+    return errs;
+  };
+
+  const formErrors = getFormErrors();
+  const isFormValid = Object.keys(cart).length > 0 && !Object.values(formErrors).some(Boolean);
+
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
   };
 
   const handleSearch = (e) => setSearch(e.target.value);
@@ -75,8 +94,9 @@ export default function CustomerOrderBook({ user, onNavigate }) {
       return;
     }
 
-    if (!deliveryDate) {
-      setError('Please select a delivery date');
+    const errors = getFormErrors();
+    if (Object.values(errors).some(Boolean)) {
+      setTouched({ deliveryDate: true, recurringDays: true });
       return;
     }
 
@@ -92,7 +112,7 @@ export default function CustomerOrderBook({ user, onNavigate }) {
         items,
         deliveryDate,
         isRecurring,
-        recurringIntervalDays: isRecurring ? recurringDays : 30
+        recurringIntervalDays: isRecurring ? Number(recurringDays) : 30
       });
       setSuccess('Order placed successfully! We will process it shortly.');
       setCart({});
@@ -197,13 +217,19 @@ export default function CustomerOrderBook({ user, onNavigate }) {
         {success && <div style={{ background: '#d1fae5', color: '#065f46', padding: '10px', borderRadius: '6px', fontSize: '13px', marginBottom: '15px' }}>{success}</div>}
 
         <div style={{ marginBottom: '15px' }}>
-          <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Required Delivery Date</label>
+          <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+            Required Delivery Date<span style={{ color: '#ef4444' }}>*</span>
+          </label>
           <input 
             type="date"
             value={deliveryDate}
             onChange={(e) => setDeliveryDate(e.target.value)}
-            style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
+            onBlur={() => handleBlur('deliveryDate')}
+            style={{ width: '100%', padding: '10px', borderRadius: '6px', border: touched.deliveryDate && formErrors.deliveryDate ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none' }}
           />
+          {touched.deliveryDate && formErrors.deliveryDate && (
+            <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.deliveryDate}</div>
+          )}
         </div>
 
         <div style={{ marginBottom: '20px', padding: '15px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
@@ -221,29 +247,33 @@ export default function CustomerOrderBook({ user, onNavigate }) {
             <div style={{ marginTop: '10px' }}>
               <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Deliver every (days):</label>
               <input 
-                type="number"
-                min="1"
+                type="text"
+                inputMode="numeric"
                 value={recurringDays}
-                onChange={(e) => setRecurringDays(e.target.value)}
-                style={{ width: '100%', padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none' }}
+                onChange={(e) => setRecurringDays(formatNumberInput(e.target.value, false))}
+                onBlur={() => handleBlur('recurringDays')}
+                style={{ width: '100%', padding: '6px 10px', borderRadius: '4px', border: touched.recurringDays && formErrors.recurringDays ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none' }}
               />
+              {touched.recurringDays && formErrors.recurringDays && (
+                <div style={{ color: '#ef4444', fontSize: '11px', marginTop: '2px' }}>{formErrors.recurringDays}</div>
+              )}
             </div>
           )}
         </div>
 
         <button 
           onClick={handleCheckout}
-          disabled={Object.keys(cart).length === 0 || submitting}
+          disabled={!isFormValid || submitting}
           style={{ 
             width: '100%', 
             padding: '12px', 
-            background: Object.keys(cart).length === 0 || submitting ? '#94a3b8' : '#10b981', 
+            background: !isFormValid || submitting ? '#94a3b8' : '#10b981', 
             color: '#fff', 
             border: 'none', 
             borderRadius: '8px', 
             fontWeight: 'bold', 
             fontSize: '15px',
-            cursor: Object.keys(cart).length === 0 || submitting ? 'not-allowed' : 'pointer',
+            cursor: !isFormValid || submitting ? 'not-allowed' : 'pointer',
             transition: 'background 0.2s'
           }}
         >

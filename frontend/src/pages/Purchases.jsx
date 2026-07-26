@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { validatePurchaseForm, formatNumberInput } from '../utils/validation';
 
 export default function Purchases() {
   const [purchaseOrders, setPurchaseOrders] = useState([]);
@@ -17,6 +18,7 @@ export default function Purchases() {
   const [expectedDate, setExpectedDate] = useState('');
   const [branchId, setBranchId] = useState('');
   const [poItems, setPoItems] = useState([{ product: '', quantity: 1, costPrice: 0 }]);
+  const [touched, setTouched] = useState({});
 
   const fetchData = async () => {
     try {
@@ -44,6 +46,14 @@ export default function Purchases() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const formErrors = validatePurchaseForm(selectedSupplierId, expectedDate, branchId, poItems);
+  const isFormValid = !Object.values(formErrors).some(Boolean);
+
+
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+  };
 
   const handleOpenAdd = () => {
     setSelectedSupplierId(suppliers[0]?._id || '');
@@ -250,45 +260,60 @@ export default function Purchases() {
           <div style={{ background: '#fff', borderRadius: '12px', padding: '24px', width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
             <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#0f172a', marginBottom: '15px' }}>Create Supplier Purchase Order</h3>
             
-            <form onSubmit={handleSubmitPO} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <form onSubmit={handleSubmitPO} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Select Supplier Vendor*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Select Supplier Vendor<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <select 
                   value={selectedSupplierId}
                   onChange={(e) => setSelectedSupplierId(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none', background: '#fff' }}
-                  required
+                  onBlur={() => handleBlur('supplierId')}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.supplierId && formErrors.supplierId ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none', background: '#fff' }}
                 >
                   <option value="">Choose Supplier</option>
                   {suppliers.map(s => (
                     <option key={s._id} value={s._id}>{s.name} (GST: {s.gstNumber || 'None'})</option>
                   ))}
                 </select>
+                {touched.supplierId && formErrors.supplierId && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.supplierId}</div>
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: '15px' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Expected Delivery Date*</label>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                    Expected Delivery Date<span style={{ color: '#ef4444' }}>*</span>
+                  </label>
                   <input 
                     type="date"
                     value={expectedDate}
                     onChange={(e) => setExpectedDate(e.target.value)}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                    required
+                    onBlur={() => handleBlur('expectedDate')}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.expectedDate && formErrors.expectedDate ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
                   />
+                  {touched.expectedDate && formErrors.expectedDate && (
+                    <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.expectedDate}</div>
+                  )}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Receiving Branch*</label>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                    Receiving Branch<span style={{ color: '#ef4444' }}>*</span>
+                  </label>
                   <select 
                     value={branchId}
                     onChange={(e) => setBranchId(e.target.value)}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none', background: '#fff' }}
-                    required
+                    onBlur={() => handleBlur('branchId')}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.branchId && formErrors.branchId ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none', background: '#fff' }}
                   >
                     {branches.map(br => (
                       <option key={br._id} value={br._id}>{br.name}</option>
                     ))}
                   </select>
+                  {touched.branchId && formErrors.branchId && (
+                    <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.branchId}</div>
+                  )}
                 </div>
               </div>
 
@@ -301,8 +326,7 @@ export default function Purchases() {
                       <select 
                         value={item.product}
                         onChange={(e) => handleItemProductChange(idx, e.target.value)}
-                        style={{ flex: 2, padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none', background: '#fff' }}
-                        required
+                        style={{ flex: 2, padding: '8px 12px', borderRadius: '6px', border: !item.product && touched.items ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none', background: '#fff' }}
                       >
                         <option value="">Select Product</option>
                         {products.map(p => (
@@ -311,23 +335,21 @@ export default function Purchases() {
                       </select>
 
                       <input 
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         placeholder="Qty"
-                        min="1"
                         value={item.quantity}
-                        onChange={(e) => handleItemFieldChange(idx, 'quantity', e.target.value)}
+                        onChange={(e) => handleItemFieldChange(idx, 'quantity', formatNumberInput(e.target.value, false))}
                         style={{ width: '85px', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
-                        required
                       />
 
                       <input 
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="Cost"
-                        step="0.01"
                         value={item.costPrice}
-                        onChange={(e) => handleItemFieldChange(idx, 'costPrice', e.target.value)}
+                        onChange={(e) => handleItemFieldChange(idx, 'costPrice', formatNumberInput(e.target.value, true))}
                         style={{ width: '90px', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
-                        required
                       />
 
                       <div style={{ width: '80px', fontSize: '13px', color: '#475569', textAlign: 'right' }}>
@@ -344,6 +366,9 @@ export default function Purchases() {
                     </div>
                   ))}
                 </div>
+                {touched.items && formErrors.items && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.items}</div>
+                )}
                 <button 
                   type="button" 
                   onClick={handleAddItemRow}
@@ -369,7 +394,8 @@ export default function Purchases() {
                 </button>
                 <button 
                   type="submit" 
-                  style={{ flex: 1, padding: '10px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
+                  disabled={!isFormValid}
+                  style={{ flex: 1, padding: '10px', background: isFormValid ? '#3b82f6' : '#94a3b8', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: isFormValid ? 'pointer' : 'not-allowed' }}
                 >
                   Dispatch PO
                 </button>

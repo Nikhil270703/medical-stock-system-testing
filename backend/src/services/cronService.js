@@ -112,13 +112,30 @@ const runRecurringOrdersJob = async () => {
   }
 };
 
+const runWeeklySqliteBackupJob = async () => {
+  console.log('[cron-service] Running weekly MongoDB to SQLite database backup...');
+  try {
+    const { runBackup } = require('../../scripts/backupToSqlite');
+    await runBackup();
+    console.log('[cron-service] Weekly SQLite backup completed successfully.');
+  } catch (err) {
+    console.error('[cron-service] Weekly SQLite backup failed:', err.message);
+  }
+};
+
 const initCron = () => {
   // Run every day at midnight (00:00)
   cron.schedule('0 0 * * *', () => {
     runReminderJob();
     runRecurringOrdersJob();
   });
-  console.log('[cron-service] node-cron scheduler initialized successfully.');
+
+  // Run weekly SQLite backup every Sunday at 03:00 AM
+  cron.schedule('0 3 * * 0', () => {
+    runWeeklySqliteBackupJob();
+  });
+
+  console.log('[cron-service] node-cron scheduler initialized successfully (daily reminders & weekly SQLite backup).');
   
   // Proactively run once on startup
   setTimeout(() => {
@@ -127,4 +144,5 @@ const initCron = () => {
   }, 5000);
 };
 
-module.exports = { initCron, runReminderJob, runRecurringOrdersJob };
+module.exports = { initCron, runReminderJob, runRecurringOrdersJob, runWeeklySqliteBackupJob };
+

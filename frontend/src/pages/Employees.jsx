@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { validateEmployeeForm, formatMobileInput, sanitizeText, sanitizeEmail } from '../utils/validation';
 
 export default function Employees() {
   const [employees, setEmployees] = useState([]);
@@ -17,6 +18,7 @@ export default function Employees() {
   // Form State
   const [showAdd, setShowAdd] = useState(false);
   const [formData, setFormData] = useState({ name: '', mobile: '', role: 'Delivery Staff', joiningDate: '', branchId: '', email: '', password: '' });
+  const [touched, setTouched] = useState({});
 
   const fetchData = async () => {
     try {
@@ -60,14 +62,33 @@ export default function Employees() {
     fetchPerformance();
   }, []);
 
+  const formErrors = validateEmployeeForm(formData);
+  const isFormValid = !Object.values(formErrors).some(Boolean);
+
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSuccess('');
     setError('');
+    const errors = validateEmployeeForm(formData);
+    if (Object.values(errors).some(Boolean)) {
+
+      setTouched({ name: true, mobile: true, branchId: true, email: true, password: true });
+      return;
+    }
+    const payload = {
+      ...formData,
+      name: sanitizeText(formData.name),
+      email: formData.email ? sanitizeEmail(formData.email) : ''
+    };
     try {
-      await api.post('/employees', formData);
+      await api.post('/employees', payload);
       setSuccess('Employee profile registered successfully! ✅');
       setShowAdd(false);
+      setTouched({});
       setFormData({ name: '', mobile: '', role: 'Delivery Staff', joiningDate: '', branchId: branches[0]?._id || '', email: '', password: '' });
       fetchData();
       fetchPerformance();
@@ -241,32 +262,46 @@ export default function Employees() {
           <div style={{ background: '#fff', borderRadius: '12px', padding: '24px', width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
             <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#0f172a', marginBottom: '15px' }}>Register Employee Profile</h3>
             
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Employee Name*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Employee Name<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <input 
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                  required
+                  onBlur={() => handleBlur('name')}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.name && formErrors.name ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
                 />
+                {touched.name && formErrors.name && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.name}</div>
+                )}
               </div>
 
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Mobile Number*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Mobile Number<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <input 
                   type="tel"
                   value={formData.mobile}
-                  onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                  required
+                  onChange={(e) => setFormData({ ...formData, mobile: formatMobileInput(e.target.value) })}
+                  onBlur={() => handleBlur('mobile')}
+                  placeholder="10-digit mobile number"
+                  maxLength={10}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.mobile && formErrors.mobile ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
                 />
+                {touched.mobile && formErrors.mobile && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.mobile}</div>
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: '15px' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Role Profile*</label>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                    Role Profile<span style={{ color: '#ef4444' }}>*</span>
+                  </label>
                   <select 
                     value={formData.role} 
                     onChange={(e) => setFormData({ ...formData, role: e.target.value })}
@@ -279,12 +314,13 @@ export default function Employees() {
                   </select>
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Branch Scoped*</label>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                    Branch Scoped<span style={{ color: '#ef4444' }}>*</span>
+                  </label>
                   <select 
                     value={formData.branchId} 
                     onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
                     style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff' }}
-                    required
                   >
                     {branches.map(br => (
                       <option key={br._id} value={br._id}>{br.name}</option>
@@ -312,8 +348,13 @@ export default function Employees() {
                       type="email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff' }}
+                      onBlur={() => handleBlur('email')}
+                      placeholder="email@example.com"
+                      style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: touched.email && formErrors.email ? '1px solid #ef4444' : '1px solid #cbd5e1', background: '#fff' }}
                     />
+                    {touched.email && formErrors.email && (
+                      <div style={{ color: '#ef4444', fontSize: '11px', marginTop: '4px' }}>{formErrors.email}</div>
+                    )}
                   </div>
                   <div>
                     <label style={{ fontSize: '11px', color: '#64748b' }}>Password</label>
@@ -321,8 +362,13 @@ export default function Employees() {
                       type="password"
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff' }}
+                      onBlur={() => handleBlur('password')}
+                      placeholder="Min 8 characters"
+                      style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: touched.password && formErrors.password ? '1px solid #ef4444' : '1px solid #cbd5e1', background: '#fff' }}
                     />
+                    {touched.password && formErrors.password && (
+                      <div style={{ color: '#ef4444', fontSize: '11px', marginTop: '4px' }}>{formErrors.password}</div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -337,7 +383,8 @@ export default function Employees() {
                 </button>
                 <button 
                   type="submit" 
-                  style={{ flex: 1, padding: '10px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
+                  disabled={!isFormValid}
+                  style={{ flex: 1, padding: '10px', background: isFormValid ? '#3b82f6' : '#94a3b8', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: isFormValid ? 'pointer' : 'not-allowed' }}
                 >
                   Save Profile
                 </button>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
+import { validateProductForm, formatNumberInput, sanitizeText } from '../utils/validation';
 
 export default function Products() {
   const [products, setProducts] = useState([]);
@@ -16,16 +17,19 @@ export default function Products() {
   // Form State for CRUD
   const [showAdd, setShowAdd] = useState(false);
   const [formData, setFormData] = useState({ name: '', category: '', unit: '', price: '', currentStock: '', lowStockThreshold: '', linkedVendor: '', hsnCode: 'HSN3004', branchId: '' });
+  const [touched, setTouched] = useState({});
 
   // Stock Adjustment Modal state
   const [adjustingProduct, setAdjustingProduct] = useState(null);
   const [adjustForm, setAdjustForm] = useState({ newQty: '', reason: 'recount' });
+  const [adjustTouched, setAdjustTouched] = useState({});
   const [selectedProductLogs, setSelectedProductLogs] = useState([]);
   const [showLogsModal, setShowLogsModal] = useState(null);
 
   // Quick Order Modal state
   const [orderingProduct, setOrderingProduct] = useState(null);
   const [orderForm, setOrderForm] = useState({ quantity: '', expectedDeliveryDate: '' });
+  const [orderTouched, setOrderTouched] = useState({});
 
   const fetchData = async () => {
     try {
@@ -57,14 +61,35 @@ export default function Products() {
     fetchData();
   }, []);
 
+  const addErrors = validateProductForm(formData);
+  const isAddValid = !Object.values(addErrors).some(Boolean);
+
+
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+  };
+
   const handleAddSubmit = async (e) => {
     e.preventDefault();
     setSuccess('');
     setError('');
+    const errors = validateProductForm(formData);
+    if (Object.values(errors).some(Boolean)) {
+      setTouched({ name: true, category: true, hsnCode: true, unit: true, price: true, currentStock: true, lowStockThreshold: true, linkedVendor: true, branchId: true });
+      return;
+    }
+    const payload = {
+      ...formData,
+      name: sanitizeText(formData.name),
+      category: sanitizeText(formData.category),
+      hsnCode: sanitizeText(formData.hsnCode),
+      unit: sanitizeText(formData.unit)
+    };
     try {
-      await api.post('/products', formData);
+      await api.post('/products', payload);
       setSuccess('Product registered successfully! ✅');
       setShowAdd(false);
+      setTouched({});
       setFormData({ name: '', category: '', unit: '', price: '', currentStock: '', lowStockThreshold: '', linkedVendor: vendors[0]?._id || '', hsnCode: 'HSN3004', branchId: branches[0]?._id || '' });
       fetchData();
     } catch (err) {
@@ -320,95 +345,133 @@ export default function Products() {
           <div style={{ background: '#fff', borderRadius: '12px', padding: '24px', width: '100%', maxWidth: '450px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
             <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#0f172a', marginBottom: '15px' }}>Register Product</h3>
             
-            <form onSubmit={handleAddSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <form onSubmit={handleAddSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Product Name*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Product Name<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <input 
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                  required
+                  onBlur={() => handleBlur('name')}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.name && addErrors.name ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
                 />
+                {touched.name && addErrors.name && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{addErrors.name}</div>
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: '10px' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Category*</label>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                    Category<span style={{ color: '#ef4444' }}>*</span>
+                  </label>
                   <input 
                     type="text"
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                    required
+                    onBlur={() => handleBlur('category')}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.category && addErrors.category ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
                   />
+                  {touched.category && addErrors.category && (
+                    <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{addErrors.category}</div>
+                  )}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>HSN Code*</label>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                    HSN Code<span style={{ color: '#ef4444' }}>*</span>
+                  </label>
                   <input 
                     type="text"
                     value={formData.hsnCode}
                     onChange={(e) => setFormData({ ...formData, hsnCode: e.target.value })}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                    required
+                    onBlur={() => handleBlur('hsnCode')}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.hsnCode && addErrors.hsnCode ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
                   />
+                  {touched.hsnCode && addErrors.hsnCode && (
+                    <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{addErrors.hsnCode}</div>
+                  )}
                 </div>
               </div>
 
               <div style={{ display: 'flex', gap: '10px' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Unit (e.g. strips)*</label>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                    Unit (e.g. strips)<span style={{ color: '#ef4444' }}>*</span>
+                  </label>
                   <input 
                     type="text"
                     value={formData.unit}
                     onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                    required
+                    onBlur={() => handleBlur('unit')}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.unit && addErrors.unit ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
                   />
+                  {touched.unit && addErrors.unit && (
+                    <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{addErrors.unit}</div>
+                  )}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Retail Price (Rs.)*</label>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                    Retail Price (Rs.)<span style={{ color: '#ef4444' }}>*</span>
+                  </label>
                   <input 
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                    required
+                    onChange={(e) => setFormData({ ...formData, price: formatNumberInput(e.target.value, true) })}
+                    onBlur={() => handleBlur('price')}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.price && addErrors.price ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
                   />
+                  {touched.price && addErrors.price && (
+                    <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{addErrors.price}</div>
+                  )}
                 </div>
               </div>
 
               <div style={{ display: 'flex', gap: '10px' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Initial Stock*</label>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                    Initial Stock<span style={{ color: '#ef4444' }}>*</span>
+                  </label>
                   <input 
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     value={formData.currentStock}
-                    onChange={(e) => setFormData({ ...formData, currentStock: e.target.value })}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                    required
+                    onChange={(e) => setFormData({ ...formData, currentStock: formatNumberInput(e.target.value, false) })}
+                    onBlur={() => handleBlur('currentStock')}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.currentStock && addErrors.currentStock ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
                   />
+                  {touched.currentStock && addErrors.currentStock && (
+                    <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{addErrors.currentStock}</div>
+                  )}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Reorder Level*</label>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                    Reorder Level<span style={{ color: '#ef4444' }}>*</span>
+                  </label>
                   <input 
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     value={formData.lowStockThreshold}
-                    onChange={(e) => setFormData({ ...formData, lowStockThreshold: e.target.value })}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                    required
+                    onChange={(e) => setFormData({ ...formData, lowStockThreshold: formatNumberInput(e.target.value, false) })}
+                    onBlur={() => handleBlur('lowStockThreshold')}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.lowStockThreshold && addErrors.lowStockThreshold ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
                   />
+                  {touched.lowStockThreshold && addErrors.lowStockThreshold && (
+                    <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{addErrors.lowStockThreshold}</div>
+                  )}
                 </div>
               </div>
 
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Supplier Vendor*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Supplier Vendor<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <select 
                   value={formData.linkedVendor} 
                   onChange={(e) => setFormData({ ...formData, linkedVendor: e.target.value })}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff' }}
-                  required
                 >
                   {vendors.map(v => (
                     <option key={v._id} value={v._id}>{v.name}</option>
@@ -417,12 +480,13 @@ export default function Products() {
               </div>
 
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Branch Scoped*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Branch Scoped<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <select 
                   value={formData.branchId} 
                   onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff' }}
-                  required
                 >
                   {branches.map(br => (
                     <option key={br._id} value={br._id}>{br.name}</option>
@@ -440,7 +504,8 @@ export default function Products() {
                 </button>
                 <button 
                   type="submit" 
-                  style={{ flex: 1, padding: '10px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
+                  disabled={!isAddValid}
+                  style={{ flex: 1, padding: '10px', background: isAddValid ? '#3b82f6' : '#94a3b8', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: isAddValid ? 'pointer' : 'not-allowed' }}
                 >
                   Register
                 </button>

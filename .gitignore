@@ -1,0 +1,29 @@
+# ==========================
+# SQLite Backups
+# ==========================
+
+sqlite_backups/
+*.sqlite
+backup_manifest.json
+
+# ==========================
+# Environment Files
+# ==========================
+
+.env
+.env.local
+.env.development
+.env.production
+
+# ==========================
+# Logs
+# ==========================
+
+*.log
+
+# ==========================
+# OS Files
+# ==========================
+
+.DS_Store
+Thumbs.db

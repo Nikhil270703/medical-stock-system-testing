@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { validatePaymentForm, formatNumberInput, sanitizeText } from '../utils/validation';
 
 export default function Payments() {
   const [payments, setPayments] = useState([]);
@@ -9,6 +10,7 @@ export default function Payments() {
   const [customers, setCustomers] = useState([]);
   const [payModal, setPayModal] = useState(false);
   const [payData, setPayData] = useState({ customerId: '', amountPaid: '', paymentMode: 'UPI', referenceNumber: '', notes: '', autoAllocate: true });
+  const [touched, setTouched] = useState({});
 
   const fetchPayments = async () => {
     try {
@@ -36,21 +38,35 @@ export default function Payments() {
     fetchCustomers();
   }, []);
 
+  const formErrors = validatePaymentForm(payData);
+  const isFormValid = !Object.values(formErrors).some(Boolean);
+
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+  };
+
   const handleSavePayment = async (e) => {
     e.preventDefault();
+    const errors = validatePaymentForm(payData);
+    if (Object.values(errors).some(Boolean)) {
+
+      setTouched({ customerId: true, amountPaid: true });
+      return;
+    }
     try {
       setError('');
       const payload = {
         customerId: payData.customerId,
         amountPaid: Number(payData.amountPaid),
         paymentMode: payData.paymentMode,
-        referenceNumber: payData.referenceNumber,
-        notes: payData.notes,
+        referenceNumber: sanitizeText(payData.referenceNumber),
+        notes: sanitizeText(payData.notes),
         autoAllocate: payData.autoAllocate
       };
 
       await api.post('/payments', payload);
       setPayModal(false);
+      setTouched({});
       fetchPayments();
     } catch (err) {
       console.error(err);
@@ -148,32 +164,42 @@ export default function Payments() {
             <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#0f172a', marginBottom: '10px' }}>Log General Payment</h3>
             <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '15px' }}>Record a payment against a customer. The amount will be automatically allocated to their oldest unpaid invoices (FIFO) if auto-allocate is checked.</p>
             
-            <form onSubmit={handleSavePayment} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <form onSubmit={handleSavePayment} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Customer*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Customer<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <select 
                   value={payData.customerId}
                   onChange={(e) => setPayData({ ...payData, customerId: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none', background: '#fff' }}
-                  required
+                  onBlur={() => handleBlur('customerId')}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.customerId && formErrors.customerId ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none', background: '#fff' }}
                 >
                   <option value="">Select Customer...</option>
                   {customers.map(c => (
                     <option key={c._id} value={c._id}>{c.name} ({c.mobile})</option>
                   ))}
                 </select>
+                {touched.customerId && formErrors.customerId && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.customerId}</div>
+                )}
               </div>
 
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Amount Paid (Rs.)*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Amount Paid (Rs.)<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <input 
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={payData.amountPaid}
-                  onChange={(e) => setPayData({ ...payData, amountPaid: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
-                  required
+                  onChange={(e) => setPayData({ ...payData, amountPaid: formatNumberInput(e.target.value, true) })}
+                  onBlur={() => handleBlur('amountPaid')}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.amountPaid && formErrors.amountPaid ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none' }}
                 />
+                {touched.amountPaid && formErrors.amountPaid && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.amountPaid}</div>
+                )}
               </div>
 
               <div>
@@ -232,7 +258,8 @@ export default function Payments() {
                 </button>
                 <button 
                   type="submit" 
-                  style={{ flex: 1, padding: '10px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
+                  disabled={!isFormValid}
+                  style={{ flex: 1, padding: '10px', background: isFormValid ? '#10b981' : '#94a3b8', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: isFormValid ? 'pointer' : 'not-allowed' }}
                 >
                   Submit Payment
                 </button>

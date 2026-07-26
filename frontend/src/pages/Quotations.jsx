@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { validateQuotationForm, formatNumberInput } from '../utils/validation';
 
 export default function Quotations() {
   const [quotations, setQuotations] = useState([]);
@@ -14,6 +15,7 @@ export default function Quotations() {
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [validDays, setValidDays] = useState(15);
   const [quotationItems, setQuotationItems] = useState([{ product: '', quantity: 1, price: 0 }]);
+  const [touched, setTouched] = useState({});
 
   const fetchData = async () => {
     try {
@@ -36,6 +38,14 @@ export default function Quotations() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const formErrors = validateQuotationForm(selectedCustomerId, validDays, quotationItems);
+  const isFormValid = !Object.values(formErrors).some(Boolean);
+
+
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+  };
 
   const handleOpenAdd = () => {
     setSelectedCustomerId('');
@@ -306,32 +316,42 @@ export default function Quotations() {
           <div style={{ background: '#fff', borderRadius: '12px', padding: '24px', width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
             <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#0f172a', marginBottom: '15px' }}>{formMode === 'edit' ? 'Edit Quotation' : 'Create Cost Estimation Quotation'}</h3>
             
-            <form onSubmit={handleSubmitQuotation} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <form onSubmit={handleSubmitQuotation} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Select Customer*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Select Customer<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <select 
                   value={selectedCustomerId}
                   onChange={(e) => setSelectedCustomerId(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none', background: '#fff' }}
-                  required
+                  onBlur={() => handleBlur('customerId')}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.customerId && formErrors.customerId ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none', background: '#fff' }}
                 >
                   <option value="">-- Choose Customer --</option>
                   {customers.map(c => (
                     <option key={c._id} value={c._id}>{c.name}</option>
                   ))}
                 </select>
+                {touched.customerId && formErrors.customerId && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.customerId}</div>
+                )}
               </div>
 
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Quote Validity (Days)*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Quote Validity (Days)<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <input 
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={validDays}
-                  onChange={(e) => setValidDays(Number(e.target.value))}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
-                  required
-                  min="1"
+                  onChange={(e) => setValidDays(formatNumberInput(e.target.value, false))}
+                  onBlur={() => handleBlur('validDays')}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.validDays && formErrors.validDays ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none' }}
                 />
+                {touched.validDays && formErrors.validDays && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.validDays}</div>
+                )}
               </div>
 
               {/* Items Section */}
@@ -343,8 +363,7 @@ export default function Quotations() {
                       <select 
                         value={item.product}
                         onChange={(e) => handleItemProductChange(idx, e.target.value)}
-                        style={{ flex: 2, padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none', background: '#fff' }}
-                        required
+                        style={{ flex: 2, padding: '8px 12px', borderRadius: '6px', border: !item.product && touched.items ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none', background: '#fff' }}
                       >
                         <option value="">Select Product</option>
                         {products.map(p => (
@@ -353,25 +372,22 @@ export default function Quotations() {
                       </select>
 
                       <input 
-                        type="number"
-                        min="1"
+                        type="text"
+                        inputMode="numeric"
                         value={item.quantity}
-                        onChange={(e) => handleItemQtyChange(idx, e.target.value)}
+                        onChange={(e) => handleItemQtyChange(idx, formatNumberInput(e.target.value, false))}
                         style={{ width: '80px', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
-                        required
                         title="Quantity"
                       />
 
                       <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', padding: '0 8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
                         <span style={{ fontSize: '13px', color: '#475569', marginRight: '4px' }}>Rs.</span>
                         <input 
-                          type="number"
-                          step="0.01"
-                          min="0"
+                          type="text"
+                          inputMode="decimal"
                           value={item.price}
-                          onChange={(e) => handleItemPriceChange(idx, e.target.value)}
+                          onChange={(e) => handleItemPriceChange(idx, formatNumberInput(e.target.value, true))}
                           style={{ width: '70px', padding: '8px 0', border: 'none', background: 'transparent', outline: 'none', fontSize: '13px' }}
-                          required
                           title="Price per unit"
                         />
                       </div>
@@ -390,6 +406,9 @@ export default function Quotations() {
                     </div>
                   ))}
                 </div>
+                {touched.items && formErrors.items && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.items}</div>
+                )}
                 <button 
                   type="button" 
                   onClick={handleAddItemRow}
@@ -415,7 +434,8 @@ export default function Quotations() {
                 </button>
                 <button 
                   type="submit" 
-                  style={{ flex: 1, padding: '10px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
+                  disabled={!isFormValid}
+                  style={{ flex: 1, padding: '10px', background: isFormValid ? '#3b82f6' : '#94a3b8', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: isFormValid ? 'pointer' : 'not-allowed' }}
                 >
                   {formMode === 'edit' ? 'Save Changes' : 'Create Proposal'}
                 </button>

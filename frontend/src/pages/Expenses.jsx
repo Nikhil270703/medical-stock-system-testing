@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { validateExpenseForm, formatNumberInput, sanitizeText } from '../utils/validation';
 
 export default function Expenses() {
   const [expenses, setExpenses] = useState([]);
@@ -11,6 +12,7 @@ export default function Expenses() {
   // Form State
   const [showAdd, setShowAdd] = useState(false);
   const [formData, setFormData] = useState({ category: 'fuel', amount: '', date: '', notes: '', receiptImage: '', branchId: '' });
+  const [touched, setTouched] = useState({});
 
   const fetchData = async () => {
     try {
@@ -35,6 +37,13 @@ export default function Expenses() {
     fetchData();
   }, []);
 
+  const formErrors = validateExpenseForm(formData);
+  const isFormValid = !Object.values(formErrors).some(Boolean);
+
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+  };
+
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -50,10 +59,21 @@ export default function Expenses() {
     e.preventDefault();
     setSuccess('');
     setError('');
+    const errors = validateExpenseForm(formData);
+    if (Object.values(errors).some(Boolean)) {
+
+      setTouched({ category: true, amount: true, branchId: true });
+      return;
+    }
+    const payload = {
+      ...formData,
+      notes: sanitizeText(formData.notes)
+    };
     try {
-      await api.post('/expenses', formData);
+      await api.post('/expenses', payload);
       setSuccess('Expense logged successfully! ✅');
       setShowAdd(false);
+      setTouched({});
       setFormData({ category: 'fuel', amount: '', date: '', notes: '', receiptImage: '', branchId: branches[0]?._id || '' });
       fetchData();
     } catch (err) {
@@ -159,9 +179,11 @@ export default function Expenses() {
           <div style={{ background: '#fff', borderRadius: '12px', padding: '24px', width: '100%', maxWidth: '450px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
             <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#0f172a', marginBottom: '15px' }}>Add Expense</h3>
             
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Category*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Category<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <select 
                   value={formData.category} 
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
@@ -175,16 +197,20 @@ export default function Expenses() {
               </div>
 
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Amount (Rs.)*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Amount (Rs.)<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <input 
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={formData.amount}
-                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                  required
-                  min="0.01"
+                  onChange={(e) => setFormData({ ...formData, amount: formatNumberInput(e.target.value, true) })}
+                  onBlur={() => handleBlur('amount')}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.amount && formErrors.amount ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
                 />
+                {touched.amount && formErrors.amount && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.amount}</div>
+                )}
               </div>
 
               <div>
@@ -198,12 +224,13 @@ export default function Expenses() {
               </div>
 
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Branch*</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Branch<span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <select 
                   value={formData.branchId} 
                   onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff' }}
-                  required
                 >
                   {branches.map(br => (
                     <option key={br._id} value={br._id}>{br.name}</option>
@@ -244,7 +271,8 @@ export default function Expenses() {
                 </button>
                 <button 
                   type="submit" 
-                  style={{ flex: 1, padding: '10px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
+                  disabled={!isFormValid}
+                  style={{ flex: 1, padding: '10px', background: isFormValid ? '#3b82f6' : '#94a3b8', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: isFormValid ? 'pointer' : 'not-allowed' }}
                 >
                   Save Entry
                 </button>
