@@ -28,6 +28,7 @@ import FinancialDashboard from './pages/FinancialDashboard.jsx';
 import Purchases from './pages/Purchases.jsx';
 import Expenses from './pages/Expenses.jsx';
 import AuditLogs from './pages/AuditLogs.jsx';
+import Masters from './pages/Masters.jsx';
 
 export default function App() {
   const ctx = useRuntime();
@@ -151,6 +152,10 @@ export default function App() {
             </div>
           </div>
           <div className="sidebar-menu" style={{ flex: 1, overflowY: 'auto', padding: '15px 10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {/* SECTION 1: BUSINESS OPERATIONS */}
+            <div style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', padding: '8px 10px 4px 10px' }}>
+              Business Operations
+            </div>
             <div className={`menu-item ${activePage === 'dashboard' ? 'active' : ''}`} onClick={() => setActivePage('dashboard')}>📊 Dashboard</div>
             <div className={`menu-item ${activePage === 'financial_dashboard' ? 'active' : ''}`} onClick={() => setActivePage('financial_dashboard')}>💰 Sales Dashboard</div>
             <div className={`menu-item ${activePage === 'customers' ? 'active' : ''}`} onClick={() => setActivePage('customers')}>👥 Customers</div>
@@ -162,11 +167,17 @@ export default function App() {
             <div className={`menu-item ${activePage === 'quotations' ? 'active' : ''}`} onClick={() => setActivePage('quotations')}>📄 Quotes</div>
             <div className={`menu-item ${activePage === 'bills' ? 'active' : ''}`} onClick={() => setActivePage('bills')}>🧾 Bills</div>
             <div className={`menu-item ${activePage === 'payments' ? 'active' : ''}`} onClick={() => setActivePage('payments')}>💳 Payments</div>
-            <div className={`menu-item ${activePage === 'employees' ? 'active' : ''}`} onClick={() => setActivePage('employees')}>👥 Staff List</div>
-            <div className={`menu-item ${activePage === 'audit_logs' ? 'active' : ''}`} onClick={() => setActivePage('audit_logs')}>📜 Logs</div>
+            <div className={`menu-item ${activePage === 'employees' ? 'active' : ''}`} onClick={() => setActivePage('employees')}>👥 Staff</div>
             <div className={`menu-item ${activePage === 'reports' ? 'active' : ''}`} onClick={() => setActivePage('reports')}>📈 Reports</div>
             <div className={`menu-item ${activePage === 'whatsapp' ? 'active' : ''}`} onClick={() => setActivePage('whatsapp')}>💬 WhatsApp</div>
+
+            {/* SECTION 2: SYSTEM SETUP */}
+            <div style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', padding: '16px 10px 4px 10px', borderTop: '1px solid #f1f5f9', marginTop: '8px' }}>
+              System Setup
+            </div>
+            <div className={`menu-item ${activePage === 'masters' ? 'active' : ''}`} onClick={() => setActivePage('masters')}>🏷️ Masters</div>
             <div className={`menu-item ${activePage === 'settings' ? 'active' : ''}`} onClick={() => setActivePage('settings')}>⚙️ Settings</div>
+            <div className={`menu-item ${activePage === 'audit_logs' ? 'active' : ''}`} onClick={() => setActivePage('audit_logs')}>📜 Logs</div>
           </div>
           <div className="sidebar-footer" style={{ padding: '20px', borderTop: '1px solid #e2e8f0' }}>
             <div className="user-info" style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
@@ -252,6 +263,8 @@ export default function App() {
         return <Customers />;
       case 'vendors':
         return <Vendors />;
+      case 'masters':
+        return <Masters />;
       case 'products':
         return <Products />;
       case 'orders':

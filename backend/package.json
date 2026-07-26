@@ -26,6 +26,7 @@
     "qrcode": "^1.5.4",
     "razorpay": "^2.9.8",
     "whatsapp-web.js": "^1.34.7",
+    "xlsx": "^0.18.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {

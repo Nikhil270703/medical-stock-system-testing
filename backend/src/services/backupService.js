@@ -20,12 +20,20 @@ const Expense = require('../models/expense');
 const Setting = require('../models/setting');
 const AuditLog = require('../models/auditLog');
 
+const Category = require('../models/category');
+const Unit = require('../models/unit');
+const HsnCode = require('../models/hsnCode');
+const Notification = require('../models/notification');
+
 // Fetches all database contents and returns a serialized JSON object
 const generateDatabaseDump = async () => {
   return {
     branches: await Branch.find({}),
     users: await User.find({}),
     employees: await Employee.find({}),
+    categories: await Category.find({}),
+    units: await Unit.find({}),
+    hsnCodes: await HsnCode.find({}),
     customers: await Customer.find({}),
     vendors: await Vendor.find({}),
     products: await Product.find({}),
@@ -38,13 +46,14 @@ const generateDatabaseDump = async () => {
     stockAdjustments: await StockAdjustment.find({}),
     expenses: await Expense.find({}),
     settings: await Setting.find({}),
+    notifications: await Notification.find({}),
     auditLogs: await AuditLog.find({})
   };
 };
 
 // Writes the database dump to a local JSON backup file
 const performBackup = async () => {
-  console.log('[backup-service] Starting scheduled database backup...');
+  console.log('[backup-service] Starting database backup...');
   try {
     const data = await generateDatabaseDump();
     const backupDir = path.join(__dirname, '../../backups');
@@ -57,20 +66,42 @@ const performBackup = async () => {
     const filename = `backup_${timestamp}.json`;
     const filePath = path.join(backupDir, filename);
 
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+    const jsonStr = JSON.stringify(data, null, 2);
+    fs.writeFileSync(filePath, jsonStr);
     console.log(`[backup-service] Backup completed successfully. Saved locally: ${filePath}`);
 
-    // Mock S3/Google Drive upload check
-    const CLOUD_PROVIDER = process.env.CLOUD_BACKUP_PROVIDER; // s3 | drive
-    if (CLOUD_PROVIDER) {
-      console.log(`[backup-service] Cloud backup credentials detected. Mock-uploading ${filename} to ${CLOUD_PROVIDER.toUpperCase()}...`);
-      console.log(`[backup-service] Cloud upload completed successfully.`);
-    } else {
-      console.log('[backup-service] Cloud storage credentials not fully set. Skip uploading to cloud (Saved Locally).');
-    }
+    const stats = fs.statSync(filePath);
+    return {
+      filename,
+      filePath,
+      sizeBytes: stats.size,
+      sizeMB: (stats.size / (1024 * 1024)).toFixed(2),
+      createdAt: stats.birthtime || new Date()
+    };
   } catch (err) {
     console.error('[backup-service] Backup run failed:', err.message);
+    throw err;
   }
+};
+
+const getBackupHistory = async () => {
+  const backupDir = path.join(__dirname, '../../backups');
+  if (!fs.existsSync(backupDir)) {
+    return [];
+  }
+  const files = fs.readdirSync(backupDir).filter(f => f.endsWith('.json'));
+  const history = files.map(filename => {
+    const filePath = path.join(backupDir, filename);
+    const stats = fs.statSync(filePath);
+    return {
+      filename,
+      sizeBytes: stats.size,
+      sizeKB: (stats.size / 1024).toFixed(1),
+      sizeMB: (stats.size / (1024 * 1024)).toFixed(2),
+      createdAt: stats.birthtime || stats.mtime
+    };
+  });
+  return history.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 };
 
 // Restore database from dump object
@@ -81,6 +112,9 @@ const restoreDatabaseDump = async (dump) => {
   await Branch.deleteMany({});
   await User.deleteMany({});
   await Employee.deleteMany({});
+  await Category.deleteMany({});
+  await Unit.deleteMany({});
+  await HsnCode.deleteMany({});
   await Customer.deleteMany({});
   await Vendor.deleteMany({});
   await Product.deleteMany({});
@@ -93,31 +127,35 @@ const restoreDatabaseDump = async (dump) => {
   await StockAdjustment.deleteMany({});
   await Expense.deleteMany({});
   await Setting.deleteMany({});
+  await Notification.deleteMany({});
   await AuditLog.deleteMany({});
 
   // Restore collections
-  if (dump.branches) await Branch.insertMany(dump.branches);
-  if (dump.users) await User.insertMany(dump.users);
-  if (dump.employees) await Employee.insertMany(dump.employees);
-  if (dump.customers) await Customer.insertMany(dump.customers);
-  if (dump.vendors) await Vendor.insertMany(dump.vendors);
-  if (dump.products) await Product.insertMany(dump.products);
-  if (dump.stockHistory) await StockHistory.insertMany(dump.stockHistory);
-  if (dump.orders) await Order.insertMany(dump.orders);
-  if (dump.quotations) await Quotation.insertMany(dump.quotations);
-  if (dump.bills) await Bill.insertMany(dump.bills);
-  if (dump.payments) await Payment.insertMany(dump.payments);
-  if (dump.purchaseOrders) await PurchaseOrder.insertMany(dump.purchaseOrders);
-  if (dump.stockAdjustments) await StockAdjustment.insertMany(dump.stockAdjustments);
-  if (dump.expenses) await Expense.insertMany(dump.expenses);
-  if (dump.settings) await Setting.insertMany(dump.settings);
-  if (dump.auditLogs) await AuditLog.insertMany(dump.auditLogs);
+  if (dump.branches && dump.branches.length) await Branch.insertMany(dump.branches);
+  if (dump.users && dump.users.length) await User.insertMany(dump.users);
+  if (dump.employees && dump.employees.length) await Employee.insertMany(dump.employees);
+  if (dump.categories && dump.categories.length) await Category.insertMany(dump.categories);
+  if (dump.units && dump.units.length) await Unit.insertMany(dump.units);
+  if (dump.hsnCodes && dump.hsnCodes.length) await HsnCode.insertMany(dump.hsnCodes);
+  if (dump.customers && dump.customers.length) await Customer.insertMany(dump.customers);
+  if (dump.vendors && dump.vendors.length) await Vendor.insertMany(dump.vendors);
+  if (dump.products && dump.products.length) await Product.insertMany(dump.products);
+  if (dump.stockHistory && dump.stockHistory.length) await StockHistory.insertMany(dump.stockHistory);
+  if (dump.orders && dump.orders.length) await Order.insertMany(dump.orders);
+  if (dump.quotations && dump.quotations.length) await Quotation.insertMany(dump.quotations);
+  if (dump.bills && dump.bills.length) await Bill.insertMany(dump.bills);
+  if (dump.payments && dump.payments.length) await Payment.insertMany(dump.payments);
+  if (dump.purchaseOrders && dump.purchaseOrders.length) await PurchaseOrder.insertMany(dump.purchaseOrders);
+  if (dump.stockAdjustments && dump.stockAdjustments.length) await StockAdjustment.insertMany(dump.stockAdjustments);
+  if (dump.expenses && dump.expenses.length) await Expense.insertMany(dump.expenses);
+  if (dump.settings && dump.settings.length) await Setting.insertMany(dump.settings);
+  if (dump.notifications && dump.notifications.length) await Notification.insertMany(dump.notifications);
+  if (dump.auditLogs && dump.auditLogs.length) await AuditLog.insertMany(dump.auditLogs);
 
   console.log('[backup-service] Database restore execution completed.');
 };
 
 const initBackupCron = () => {
-  // Runs every day at 02:00 AM
   cron.schedule('0 2 * * *', () => {
     performBackup();
   });
@@ -128,5 +166,6 @@ module.exports = {
   initBackupCron,
   performBackup,
   generateDatabaseDump,
+  getBackupHistory,
   restoreDatabaseDump
 };

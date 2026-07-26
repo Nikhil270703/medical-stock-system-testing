@@ -353,11 +353,11 @@ exports.deleteCustomer = async (req, res) => {
 
 exports.createVendor = async (req, res) => {
   try {
-    const { name, contact, address, itemCategories } = req.body;
+    const { name, contact, address, itemCategories, gstNumber, gstType } = req.body;
     if (!name || !contact || !address) {
       return res.status(400).json({ error: 'Name, contact, and address are required' });
     }
-    const vendor = new Vendor({ name, contact, address, itemCategories });
+    const vendor = new Vendor({ name, contact, address, itemCategories, gstNumber, gstType });
     await vendor.save();
     res.status(201).json(vendor);
   } catch (err) {
@@ -396,11 +396,34 @@ exports.deleteVendor = async (req, res) => {
 
 exports.createProduct = async (req, res) => {
   try {
-    const { name, category, unit, price, currentStock, lowStockThreshold, linkedVendor } = req.body;
-    if (!name || !category || !unit || price === undefined || !linkedVendor) {
-      return res.status(400).json({ error: 'All fields are required' });
+    const { name, category, categories, unit, price, currentStock, lowStockThreshold, linkedVendor, hsnCode } = req.body;
+    
+    // Normalize categories array
+    let catArray = [];
+    if (Array.isArray(categories) && categories.length > 0) {
+      catArray = categories;
+    } else if (typeof category === 'string' && category.trim()) {
+      catArray = category.split(',').map(s => s.trim()).filter(Boolean);
     }
-    const product = new Product({ name, category, unit, price, currentStock, lowStockThreshold, linkedVendor });
+
+    const catString = catArray.length > 0 ? catArray.join(', ') : (category || '');
+
+    if (!name || (!catString && catArray.length === 0) || !unit || price === undefined || !linkedVendor) {
+      return res.status(400).json({ error: 'All product details (name, category, unit, price, supplier) are required' });
+    }
+
+    const product = new Product({
+      name,
+      category: catString,
+      categories: catArray.length > 0 ? catArray : [catString],
+      unit,
+      price,
+      currentStock: currentStock || 0,
+      lowStockThreshold: lowStockThreshold !== undefined ? lowStockThreshold : 10,
+      linkedVendor,
+      hsnCode: hsnCode || '3004'
+    });
+
     await product.save();
 
     // Log initial stock
@@ -421,7 +444,7 @@ exports.createProduct = async (req, res) => {
 
 exports.getProducts = async (req, res) => {
   try {
-    const products = await Product.find({}).populate('linkedVendor', 'name');
+    const products = await Product.find({}).populate('linkedVendor', 'name gstNumber gstType');
     res.json(products);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -430,7 +453,21 @@ exports.getProducts = async (req, res) => {
 
 exports.updateProduct = async (req, res) => {
   try {
-    const updated = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true }).populate('linkedVendor', 'name');
+    const { categories, category, ...rest } = req.body;
+    let updatePayload = { ...rest };
+
+    if (categories !== undefined || category !== undefined) {
+      let catArray = [];
+      if (Array.isArray(categories) && categories.length > 0) {
+        catArray = categories;
+      } else if (typeof category === 'string' && category.trim()) {
+        catArray = category.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      updatePayload.categories = catArray;
+      updatePayload.category = catArray.length > 0 ? catArray.join(', ') : (category || '');
+    }
+
+    const updated = await Product.findByIdAndUpdate(req.params.id, updatePayload, { new: true }).populate('linkedVendor', 'name gstNumber gstType');
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });

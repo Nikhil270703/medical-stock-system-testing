@@ -11,6 +11,10 @@ const productSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  categories: {
+    type: [String],
+    default: []
+  },
   unit: {
     type: String,
     required: true, // kg, pcs, litre, box, etc.

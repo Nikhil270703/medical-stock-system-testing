@@ -5,8 +5,37 @@ const authController = require('../controllers/authController');
 const shopController = require('../controllers/shopController');
 const advancedShopController = require('../controllers/advancedShopController');
 const paymentGatewayController = require('../controllers/paymentGatewayController');
+const masterController = require('../controllers/masterController');
+const importController = require('../controllers/importController');
+
+// ==================== EXCEL BULK IMPORT ====================
+router.get('/import/sample/:module', auth.verifyToken, importController.downloadSampleTemplate);
+router.post('/import/:module', auth.verifyToken, importController.importExcelData);
+
+// ==================== MASTER DATA MANAGEMENT ====================
+// Categories
+router.get('/categories', auth.verifyToken, masterController.getCategories);
+router.get('/categories/:id', auth.verifyToken, masterController.getCategoryById);
+router.post('/categories', auth.verifyToken, masterController.createCategory);
+router.put('/categories/:id', auth.verifyToken, masterController.updateCategory);
+router.delete('/categories/:id', auth.verifyToken, masterController.deleteCategory);
+
+// Units
+router.get('/units', auth.verifyToken, masterController.getUnits);
+router.get('/units/:id', auth.verifyToken, masterController.getUnitById);
+router.post('/units', auth.verifyToken, masterController.createUnit);
+router.put('/units/:id', auth.verifyToken, masterController.updateUnit);
+router.delete('/units/:id', auth.verifyToken, masterController.deleteUnit);
+
+// HSN Codes
+router.get('/hsncodes', auth.verifyToken, masterController.getHsnCodes);
+router.get('/hsncodes/:id', auth.verifyToken, masterController.getHsnCodeById);
+router.post('/hsncodes', auth.verifyToken, masterController.createHsnCode);
+router.put('/hsncodes/:id', auth.verifyToken, masterController.updateHsnCode);
+router.delete('/hsncodes/:id', auth.verifyToken, masterController.deleteHsnCode);
 
 // ==================== AUTH ROUTES ====================
+
 router.post('/auth/login', authController.login);
 router.post('/auth/register', authController.register);
 router.get('/auth/me', auth.verifyToken, authController.me);
@@ -125,6 +154,9 @@ router.delete('/expenses/:id', auth.verifyToken, advancedShopController.deleteEx
 
 // 7. Backup / Restore / Portability
 router.get('/data/backup', auth.verifyToken, advancedShopController.exportBackupJSON);
+router.post('/data/backup/create', auth.verifyToken, advancedShopController.triggerManualBackup);
+router.get('/data/backups/history', auth.verifyToken, advancedShopController.getBackupHistory);
+router.get('/data/backups/download/:filename', auth.verifyToken, advancedShopController.downloadBackupFile);
 router.post('/data/restore', auth.verifyToken, advancedShopController.importBackupJSON);
 router.post('/data/import-bulk', auth.verifyToken, advancedShopController.bulkImportExcel);
 

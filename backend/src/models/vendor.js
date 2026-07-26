@@ -21,6 +21,16 @@ const vendorSchema = new mongoose.Schema({
     type: [String],
     default: []
   },
+  gstNumber: {
+    type: String,
+    trim: true,
+    uppercase: true
+  },
+  gstType: {
+    type: String,
+    enum: ['Regular', 'Composition', 'Unregistered', 'Consumer'],
+    default: 'Regular'
+  },
   createdAt: {
     type: Date,
     default: Date.now

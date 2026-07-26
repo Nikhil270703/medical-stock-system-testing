@@ -690,6 +690,43 @@ exports.exportBackupJSON = async (req, res) => {
   }
 };
 
+exports.getBackupHistory = async (req, res) => {
+  try {
+    const history = await backupService.getBackupHistory();
+    res.json(history);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.triggerManualBackup = async (req, res) => {
+  try {
+    const info = await backupService.performBackup();
+    res.json({ message: 'Backup created successfully! 💾', backup: info });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.downloadBackupFile = async (req, res) => {
+  try {
+    const path = require('path');
+    const fs = require('fs');
+    const filename = req.params.filename;
+    const filePath = path.join(__dirname, '../../backups', filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Backup file not found' });
+    }
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.sendFile(filePath);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 exports.importBackupJSON = async (req, res) => {
   try {
     const dump = req.body;

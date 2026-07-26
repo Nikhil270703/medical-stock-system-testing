@@ -660,3 +660,57 @@ tr:hover td {
     display: block !important;
   }
 }
+
+/* Responsive Mobile & Tablet Overhaul */
+@media screen and (max-width: 768px) {
+  .app-container {
+    flex-direction: column !important;
+    height: auto !important;
+    overflow-x: hidden !important;
+  }
+
+  .sidebar {
+    width: 100% !important;
+    min-width: 100% !important;
+    height: auto !important;
+    position: relative !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--soft-gray) !important;
+  }
+
+  .sidebar-menu {
+    max-height: 240px !important;
+    overflow-y: auto !important;
+  }
+
+  .content-area {
+    padding: 12px !important;
+    width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  .top-navbar {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+
+  .nav-actions {
+    flex-wrap: wrap !important;
+    width: 100% !important;
+    justify-content: space-between !important;
+  }
+
+  /* Zero Horizontal Page Overflow & Scrollable Tables */
+  table {
+    display: block !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  input, select, textarea {
+    max-width: 100% !important;
+  }
+}

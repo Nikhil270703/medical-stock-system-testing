@@ -159,21 +159,39 @@ export function formatNumberInput(val, allowDecimal = true) {
   return val.replace(/\D/g, '');
 }
 
+export function validateGSTIN(gstNumber, gstType = 'Regular') {
+  if (gstType === 'Unregistered' || gstType === 'Consumer') {
+    return '';
+  }
+  const clean = typeof gstNumber === 'string' ? gstNumber.trim() : '';
+  if (!clean) {
+    if (gstType === 'Regular' || gstType === 'Composition') {
+      return 'GSTIN Number is required for Regular/Composition suppliers';
+    }
+    return '';
+  }
+  const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i;
+  if (!gstRegex.test(clean)) {
+    return 'Invalid 15-character GSTIN format (e.g. 27AAAAA0000A1Z5)';
+  }
+  return '';
+}
+
 // ==========================================
 // Centralized Form-Level Validators
 // ==========================================
 
 export function validateProductForm(data = {}) {
+  const hasCategories = (Array.isArray(data.categories) && data.categories.length > 0) || Boolean(typeof data.category === 'string' && data.category.trim());
   return {
     name: validateText(data.name, { required: true, fieldName: 'Product Name' }),
-    category: validateText(data.category, { required: true, fieldName: 'Category' }),
+    category: hasCategories ? '' : 'At least one Product Category is required',
     hsnCode: validateText(data.hsnCode, { required: true, fieldName: 'HSN Code' }),
     unit: validateText(data.unit, { required: true, fieldName: 'Unit' }),
     price: validateNumber(data.price, { required: true, min: 0.01, allowDecimal: true, fieldName: 'Retail Price' }),
     currentStock: validateNumber(data.currentStock, { required: true, min: 0, allowDecimal: false, fieldName: 'Initial Stock' }),
     lowStockThreshold: validateNumber(data.lowStockThreshold, { required: true, min: 0, allowDecimal: false, fieldName: 'Reorder Level' }),
-    linkedVendor: validateText(data.linkedVendor, { required: true, fieldName: 'Supplier Vendor' }),
-    branchId: validateText(data.branchId, { required: true, fieldName: 'Branch' })
+    linkedVendor: validateText(data.linkedVendor, { required: true, fieldName: 'Supplier Vendor' })
   };
 }
 
@@ -194,6 +212,8 @@ export function validateVendorForm(data = {}) {
     name: validateText(data.name, { required: true, fieldName: 'Vendor Name' }),
     contact: validateMobile(data.contact, { required: true }),
     address: validateText(data.address, { required: true, fieldName: 'Address' }),
+    gstType: validateText(data.gstType, { required: true, fieldName: 'GST Type' }),
+    gstNumber: validateGSTIN(data.gstNumber, data.gstType),
     performanceScore: validateNumber(data.performanceScore, { required: true, min: 0, max: 100, allowDecimal: false, fieldName: 'Performance Score' }),
     qualityRating: validateNumber(data.qualityRating, { required: true, min: 1, max: 5, allowDecimal: false, fieldName: 'Quality Rating' })
   };
@@ -263,4 +283,34 @@ export function validateExpenseForm(data = {}) {
     branchId: validateText(data.branchId, { required: true, fieldName: 'Branch' })
   };
 }
+
+export function validateCustomerOrderBookForm(deliveryDate, isRecurring = false, recurringDays = 30) {
+  const errs = {
+    deliveryDate: validateText(deliveryDate, { required: true, fieldName: 'Delivery Date' })
+  };
+  if (isRecurring) {
+    errs.recurringDays = validateNumber(recurringDays, { required: true, min: 1, allowDecimal: false, fieldName: 'Recurring Days' });
+  }
+  return errs;
+}
+
+export function validateMasterCategoryForm(data = {}) {
+  return {
+    name: validateText(data.name, { required: true, fieldName: 'Category Name' })
+  };
+}
+
+export function validateMasterUnitForm(data = {}) {
+  return {
+    name: validateText(data.name, { required: true, fieldName: 'Unit Name' })
+  };
+}
+
+export function validateMasterHsnForm(data = {}) {
+  return {
+    code: validateText(data.code, { required: true, fieldName: 'HSN Code' })
+  };
+}
+
+
 

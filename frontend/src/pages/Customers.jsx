@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { validateCustomerForm, formatMobileInput, formatNumberInput, sanitizeText } from '../utils/validation';
+import BulkImportModal from '../components/BulkImportModal';
 
 export default function Customers() {
   const [customers, setCustomers] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Form State
   const [formMode, setFormMode] = useState(null); // 'add' | 'edit' | null
@@ -138,12 +140,20 @@ export default function Customers() {
           onChange={(e) => setSearch(e.target.value)}
           style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', width: '320px', outline: 'none' }}
         />
-        <button 
-          onClick={handleOpenAdd}
-          style={{ padding: '10px 20px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
-        >
-          ➕ Add Customer
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            onClick={() => setShowImportModal(true)}
+            style={{ padding: '10px 16px', background: '#059669', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
+          >
+            📥 Bulk Import Excel
+          </button>
+          <button 
+            onClick={handleOpenAdd}
+            style={{ padding: '10px 20px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
+          >
+            ➕ Add Customer
+          </button>
+        </div>
       </div>
 
       {/* Customer List Table */}
@@ -504,6 +514,15 @@ export default function Customers() {
             )}
           </div>
         </div>
+      )}
+      {/* Bulk Import Modal */}
+      {showImportModal && (
+        <BulkImportModal
+          moduleName="customers"
+          title="Customers"
+          onClose={() => setShowImportModal(false)}
+          onSuccess={() => fetchCustomers()}
+        />
       )}
     </div>
   );

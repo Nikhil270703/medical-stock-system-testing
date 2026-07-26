@@ -3,6 +3,7 @@ const app = require('./src/app');
 const { connectDb } = require('./src/config/db');
 const env = require('./src/config/env');
 const { initCron } = require('./src/services/cronService');
+const { seedMasterData } = require('./src/seeds/masterSeeder');
 //require('./src/services/whatsappClient'); // Initialize local WhatsApp client
 
 const autoSeed = async () => {
@@ -57,6 +58,7 @@ const autoSeed = async () => {
   try {
     await connectDb();
     await autoSeed();
+    await seedMasterData();
     initCron();
 
     const PORT = process.env.PORT || env.PORT || 4009;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import { validateText, validateNumber, formatNumberInput } from '../utils/validation';
+import { validateCustomerOrderBookForm, formatNumberInput } from '../utils/validation';
 
 export default function CustomerOrderBook({ user, onNavigate }) {
   const [products, setProducts] = useState([]);
@@ -36,18 +36,9 @@ export default function CustomerOrderBook({ user, onNavigate }) {
     }
   };
 
-  const getFormErrors = () => {
-    const errs = {
-      deliveryDate: validateText(deliveryDate, { required: true, fieldName: 'Delivery Date' })
-    };
-    if (isRecurring) {
-      errs.recurringDays = validateNumber(recurringDays, { required: true, min: 1, allowDecimal: false, fieldName: 'Recurring Days' });
-    }
-    return errs;
-  };
-
-  const formErrors = getFormErrors();
+  const formErrors = validateCustomerOrderBookForm(deliveryDate, isRecurring, recurringDays);
   const isFormValid = Object.keys(cart).length > 0 && !Object.values(formErrors).some(Boolean);
+
 
   const handleBlur = (field) => {
     setTouched(prev => ({ ...prev, [field]: true }));
@@ -94,7 +85,7 @@ export default function CustomerOrderBook({ user, onNavigate }) {
       return;
     }
 
-    const errors = getFormErrors();
+    const errors = validateCustomerOrderBookForm(deliveryDate, isRecurring, recurringDays);
     if (Object.values(errors).some(Boolean)) {
       setTouched({ deliveryDate: true, recurringDays: true });
       return;

@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { validateVendorForm, formatMobileInput, formatNumberInput, sanitizeText } from '../utils/validation';
+import BulkImportModal from '../components/BulkImportModal';
 
 export default function Vendors() {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Form State
   const [formMode, setFormMode] = useState(null); // 'add' | 'edit' | null
-  const [formData, setFormData] = useState({ name: '', contact: '', address: '', itemCategories: '', performanceScore: 100, qualityRating: 5 });
+  const [formData, setFormData] = useState({ name: '', contact: '', address: '', itemCategories: '', gstType: 'Regular', gstNumber: '', performanceScore: 100, qualityRating: 5 });
   const [touched, setTouched] = useState({});
   const [selectedId, setSelectedId] = useState(null);
 
@@ -37,7 +39,7 @@ export default function Vendors() {
   };
 
   const handleOpenAdd = () => {
-    setFormData({ name: '', contact: '', address: '', itemCategories: '', performanceScore: 100, qualityRating: 5 });
+    setFormData({ name: '', contact: '', address: '', itemCategories: '', gstType: 'Regular', gstNumber: '', performanceScore: 100, qualityRating: 5 });
     setTouched({});
     setFormMode('add');
   };
@@ -48,6 +50,8 @@ export default function Vendors() {
       contact: vendor.contact,
       address: vendor.address,
       itemCategories: vendor.itemCategories ? vendor.itemCategories.join(', ') : '',
+      gstType: vendor.gstType || 'Regular',
+      gstNumber: vendor.gstNumber || '',
       performanceScore: vendor.performanceScore || 100,
       qualityRating: vendor.qualityRating || 5
     });
@@ -60,8 +64,7 @@ export default function Vendors() {
     e.preventDefault();
     const errors = validateVendorForm(formData);
     if (Object.values(errors).some(Boolean)) {
-
-      setTouched({ name: true, contact: true, address: true, performanceScore: true, qualityRating: true });
+      setTouched({ name: true, contact: true, address: true, gstType: true, gstNumber: true, performanceScore: true, qualityRating: true });
       return;
     }
     try {
@@ -115,12 +118,20 @@ export default function Vendors() {
       {/* Action Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: '#334155' }}>Supplier Master Directory</h2>
-        <button 
-          onClick={handleOpenAdd}
-          style={{ padding: '10px 20px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
-        >
-          ➕ Add Vendor
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            onClick={() => setShowImportModal(true)}
+            style={{ padding: '10px 16px', background: '#059669', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
+          >
+            📥 Bulk Import Excel
+          </button>
+          <button 
+            onClick={handleOpenAdd}
+            style={{ padding: '10px 20px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
+          >
+            ➕ Add Vendor
+          </button>
+        </div>
       </div>
 
       {/* Vendors Table */}
@@ -133,6 +144,7 @@ export default function Vendors() {
               <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                 <th style={{ padding: '14px 20px', fontSize: '12px', color: '#475569', fontWeight: 'bold' }}>Vendor Name</th>
                 <th style={{ padding: '14px 20px', fontSize: '12px', color: '#475569', fontWeight: 'bold' }}>Contact Details</th>
+                <th style={{ padding: '14px 20px', fontSize: '12px', color: '#475569', fontWeight: 'bold' }}>GST Details</th>
                 <th style={{ padding: '14px 20px', fontSize: '12px', color: '#475569', fontWeight: 'bold' }}>Performance</th>
                 <th style={{ padding: '14px 20px', fontSize: '12px', color: '#475569', fontWeight: 'bold' }}>Categories Supplied</th>
                 <th style={{ padding: '14px 20px', fontSize: '12px', color: '#475569', fontWeight: 'bold' }}>Address</th>
@@ -145,6 +157,14 @@ export default function Vendors() {
                   <tr key={v._id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '14px 20px', fontWeight: '600', color: '#1e293b' }}>{v.name}</td>
                     <td style={{ padding: '14px 20px', color: '#334155' }}>{v.contact}</td>
+                    <td style={{ padding: '14px 20px', color: '#334155' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ fontWeight: '600', fontSize: '12px', color: '#0f172a' }}>{v.gstNumber || 'N/A'}</span>
+                        <span style={{ fontSize: '11px', color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: '4px', width: 'fit-content' }}>
+                          {v.gstType || 'Regular'}
+                        </span>
+                      </div>
+                    </td>
                     <td style={{ padding: '14px 20px', color: '#334155' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: v.performanceScore >= 80 ? '#d1fae5' : v.performanceScore >= 50 ? '#fef3c7' : '#fee2e2', color: v.performanceScore >= 80 ? '#065f46' : v.performanceScore >= 50 ? '#b45309' : '#b91c1c', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '14px' }}>
@@ -261,6 +281,42 @@ export default function Vendors() {
 
               <div style={{ display: 'flex', gap: '15px' }}>
                 <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                    GST Type<span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <select
+                    value={formData.gstType}
+                    onChange={(e) => setFormData({ ...formData, gstType: e.target.value })}
+                    onBlur={() => handleBlur('gstType')}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff' }}
+                  >
+                    <option value="Regular">Regular</option>
+                    <option value="Composition">Composition</option>
+                    <option value="Unregistered">Unregistered</option>
+                    <option value="Consumer">Consumer</option>
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                    GSTIN Number {(formData.gstType === 'Regular' || formData.gstType === 'Composition') && <span style={{ color: '#ef4444' }}>*</span>}
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.gstNumber}
+                    onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value.toUpperCase() })}
+                    onBlur={() => handleBlur('gstNumber')}
+                    placeholder="15-character GSTIN"
+                    maxLength={15}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.gstNumber && formErrors.gstNumber ? '1px solid #ef4444' : '1px solid #cbd5e1', outline: 'none' }}
+                  />
+                  {touched.gstNumber && formErrors.gstNumber && (
+                    <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{formErrors.gstNumber}</div>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '15px' }}>
+                <div style={{ flex: 1 }}>
                   <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>Performance Score (0-100)</label>
                   <input 
                     type="text" 
@@ -309,6 +365,15 @@ export default function Vendors() {
             </form>
           </div>
         </div>
+      )}
+      {/* Bulk Import Modal */}
+      {showImportModal && (
+        <BulkImportModal
+          moduleName="suppliers"
+          title="Suppliers / Vendors"
+          onClose={() => setShowImportModal(false)}
+          onSuccess={() => fetchVendors()}
+        />
       )}
     </div>
   );

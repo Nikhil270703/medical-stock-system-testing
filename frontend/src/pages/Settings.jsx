@@ -8,6 +8,12 @@ export default function Settings() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Backup & Restore State
+  const [backupHistory, setBackupHistory] = useState([]);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [restoreFile, setRestoreFile] = useState(null);
+  const [restoring, setRestoring] = useState(false);
+
   // Add Branch Form State
   const [showAddBranch, setShowAddBranch] = useState(false);
   const [branchForm, setBranchForm] = useState({ name: '', address: '', contact: '' });
@@ -22,14 +28,25 @@ export default function Settings() {
   const normalizedBranchInput = normalizeBranchName(branchForm.name);
   const isBranchDuplicate = normalizedBranchInput !== '' && branches.some(b => normalizeBranchName(b.name) === normalizedBranchInput);
 
+  const fetchBackups = async () => {
+    try {
+      const res = await api.get('/data/backups/history');
+      setBackupHistory(res.data);
+    } catch (err) {
+      console.error('Failed to fetch backup history:', err);
+    }
+  };
+
   const fetchData = async () => {
     try {
-      const [settRes, branchRes] = await Promise.all([
+      const [settRes, branchRes, backupRes] = await Promise.all([
         api.get('/settings'),
-        api.get('/branches')
+        api.get('/branches'),
+        api.get('/data/backups/history').catch(() => ({ data: [] }))
       ]);
       setSettings(settRes.data);
       setBranches(branchRes.data);
+      setBackupHistory(backupRes.data || []);
     } catch (err) {
       console.error(err);
       setError('Failed to fetch settings parameters');
@@ -41,6 +58,79 @@ export default function Settings() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const handleCreateManualBackup = async () => {
+    try {
+      setBackupLoading(true);
+      setError('');
+      setSuccess('');
+      const res = await api.post('/data/backup/create');
+      setSuccess(res.data.message || 'System backup snapshot created successfully! 💾');
+      fetchBackups();
+    } catch (err) {
+      console.error(err);
+      setError('Failed to create manual system backup');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  const handleDownloadFullBackup = async () => {
+    try {
+      setBackupLoading(true);
+      const res = await api.get('/data/backup', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `medical_stock_system_backup_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error(err);
+      setError('Failed to download system backup file');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  const handleRestoreBackupSubmit = async (e) => {
+    e.preventDefault();
+    if (!restoreFile) {
+      alert('Please select a JSON backup file to restore.');
+      return;
+    }
+    if (!window.confirm('⚠️ WARNING: Restoring from a backup will overwrite and replace current application state with the data from the file. Are you sure you want to proceed?')) {
+      return;
+    }
+
+    try {
+      setRestoring(true);
+      setError('');
+      setSuccess('');
+
+      const fileReader = new FileReader();
+      fileReader.onload = async (event) => {
+        try {
+          const parsedJSON = JSON.parse(event.target.result);
+          await api.post('/data/restore', parsedJSON);
+          setSuccess('System state restored successfully! ✅ All records recovered.');
+          setRestoreFile(null);
+          fetchData();
+        } catch (parseErr) {
+          console.error(parseErr);
+          setError('Invalid backup JSON file format: ' + parseErr.message);
+        } finally {
+          setRestoring(false);
+        }
+      };
+      fileReader.readAsText(restoreFile);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to restore backup: ' + (err.response?.data?.error || err.message));
+      setRestoring(false);
+    }
+  };
 
   const handleUpdateSettings = async (e) => {
     e.preventDefault();
@@ -250,6 +340,102 @@ export default function Settings() {
                 Save Messages
               </button>
             </form>
+          </div>
+
+          {/* Backup & System Restore Section */}
+          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e293b', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              💾 Complete System Backup & Restore
+            </h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={handleCreateManualBackup}
+                  disabled={backupLoading}
+                  style={{ flex: 1, padding: '10px 14px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '12px', cursor: backupLoading ? 'not-allowed' : 'pointer' }}
+                >
+                  ⚡ {backupLoading ? 'Creating Backup...' : 'Create Backup Snapshot'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadFullBackup}
+                  disabled={backupLoading}
+                  style={{ flex: 1, padding: '10px 14px', background: '#059669', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '12px', cursor: backupLoading ? 'not-allowed' : 'pointer' }}
+                >
+                  📥 Download Backup (.json)
+                </button>
+              </div>
+
+              {/* Restore System State */}
+              <form onSubmit={handleRestoreBackupSubmit} style={{ background: '#f8fafc', padding: '14px', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#334155' }}>
+                  ♻️ Restore Database State from Backup File
+                </label>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={(e) => setRestoreFile(e.target.files[0] || null)}
+                    style={{ fontSize: '12px', flex: 1 }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!restoreFile || restoring}
+                    style={{ padding: '8px 16px', background: (!restoreFile || restoring) ? '#cbd5e1' : '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 'bold', fontSize: '12px', cursor: (!restoreFile || restoring) ? 'not-allowed' : 'pointer' }}
+                  >
+                    {restoring ? 'Restoring...' : 'Restore State'}
+                  </button>
+                </div>
+                <span style={{ fontSize: '10px', color: '#64748b' }}>Restores full application state including Users, Settings, Masters, Products, Orders, Purchases, and Logs.</span>
+              </form>
+
+              {/* Backup History Table */}
+              <div>
+                <h4 style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569', marginBottom: '8px' }}>
+                  📜 Backup History & Snapshots ({backupHistory.length})
+                </h4>
+                {backupHistory.length > 0 ? (
+                  <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', textAlign: 'left' }}>
+                      <thead>
+                        <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #e2e8f0' }}>
+                          <th style={{ padding: '8px 10px', color: '#475569' }}>Filename</th>
+                          <th style={{ padding: '8px 10px', color: '#475569' }}>Size</th>
+                          <th style={{ padding: '8px 10px', color: '#475569' }}>Date</th>
+                          <th style={{ padding: '8px 10px', color: '#475569', textAlign: 'right' }}>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {backupHistory.map((b, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '8px 10px', fontWeight: '600', color: '#1e293b' }}>{b.filename}</td>
+                            <td style={{ padding: '8px 10px', color: '#64748b' }}>{b.sizeKB} KB ({b.sizeMB} MB)</td>
+                            <td style={{ padding: '8px 10px', color: '#64748b' }}>{new Date(b.createdAt).toLocaleString()}</td>
+                            <td style={{ padding: '8px 10px', textAlign: 'right' }}>
+                              <a
+                                href={`${import.meta.env.VITE_API_BASE_URL || ''}/data/backups/download/${b.filename}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{ color: '#2563eb', fontWeight: 'bold', textDecoration: 'none' }}
+                              >
+                                ⬇️ Download
+                              </a>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '12px', color: '#94a3b8', background: '#f8fafc', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
+                    No automated or manual backups saved yet.
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
         </div>

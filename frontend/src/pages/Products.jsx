@@ -1,22 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import { validateProductForm, formatNumberInput, sanitizeText } from '../utils/validation';
+import SearchableSelect from '../components/SearchableSelect';
+import SearchableMultiSelect from '../components/SearchableMultiSelect';
+import BulkImportModal from '../components/BulkImportModal';
 
 export default function Products() {
   const [products, setProducts] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [branches, setBranches] = useState([]);
   const [reorderList, setReorderList] = useState([]);
+  const [masterCategories, setMasterCategories] = useState([]);
+  const [masterUnits, setMasterUnits] = useState([]);
+  const [masterHsnCodes, setMasterHsnCodes] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Tabs
   const [activeTab, setActiveTab] = useState('all'); // all | reorder
 
   // Form State for CRUD
   const [showAdd, setShowAdd] = useState(false);
-  const [formData, setFormData] = useState({ name: '', category: '', unit: '', price: '', currentStock: '', lowStockThreshold: '', linkedVendor: '', hsnCode: 'HSN3004', branchId: '' });
+  const [formData, setFormData] = useState({ name: '', categories: [], category: '', unit: '', price: '', currentStock: '', lowStockThreshold: '', linkedVendor: '', hsnCode: '', branchId: '' });
   const [touched, setTouched] = useState({});
 
   // Stock Adjustment Modal state
@@ -33,21 +41,39 @@ export default function Products() {
 
   const fetchData = async () => {
     try {
-      const [prodRes, venRes, branchRes, reorderRes] = await Promise.all([
+      const [prodRes, venRes, branchRes, reorderRes, catRes, unitRes, hsnRes] = await Promise.all([
         api.get('/products'),
         api.get('/vendors'),
         api.get('/branches'),
-        api.get('/products/reorder-list')
+        api.get('/products/reorder-list'),
+        api.get('/categories'),
+        api.get('/units'),
+        api.get('/hsncodes')
       ]);
       setProducts(prodRes.data);
       setVendors(venRes.data);
       setBranches(branchRes.data);
       setReorderList(reorderRes.data);
+
+      const activeCats = catRes.data.filter(c => c.status === 'Active');
+      const activeUnits = unitRes.data.filter(u => u.status === 'Active');
+      const activeHsns = hsnRes.data.filter(h => h.status === 'Active');
+
+      setMasterCategories(activeCats);
+      setMasterUnits(activeUnits);
+      setMasterHsnCodes(activeHsns);
+
       if (branchRes.data.length > 0) {
         setFormData(prev => ({ ...prev, branchId: branchRes.data[0]._id }));
       }
       if (venRes.data.length > 0) {
         setFormData(prev => ({ ...prev, linkedVendor: venRes.data[0]._id }));
+      }
+      if (activeUnits.length > 0) {
+        setFormData(prev => ({ ...prev, unit: activeUnits[0].name }));
+      }
+      if (activeHsns.length > 0) {
+        setFormData(prev => ({ ...prev, hsnCode: activeHsns[0].code }));
       }
     } catch (err) {
       console.error(err);
@@ -222,6 +248,14 @@ export default function Products() {
 
         <div style={{ display: 'flex', gap: '12px' }}>
           <button 
+            onClick={() => setShowImportModal(true)}
+            style={{ padding: '12px 18px', background: '#059669', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 6px -1px rgba(5,150,105,0.2)', transition: 'background 0.2s' }}
+            onMouseEnter={(e) => e.currentTarget.style.background = '#047857'}
+            onMouseLeave={(e) => e.currentTarget.style.background = '#059669'}
+          >
+            📥 Bulk Import Excel
+          </button>
+          <button 
             onClick={() => setShowAdd(true)}
             style={{ padding: '12px 20px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 6px -1px rgba(37,99,235,0.2)', transition: 'background 0.2s' }}
             onMouseEnter={(e) => e.currentTarget.style.background = '#1d4ed8'}
@@ -362,71 +396,84 @@ export default function Products() {
                 )}
               </div>
 
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
-                    Category<span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <input 
-                    type="text"
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    onBlur={() => handleBlur('category')}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.category && addErrors.category ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
-                  />
-                  {touched.category && addErrors.category && (
-                    <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{addErrors.category}</div>
-                  )}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
-                    HSN Code<span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <input 
-                    type="text"
-                    value={formData.hsnCode}
-                    onChange={(e) => setFormData({ ...formData, hsnCode: e.target.value })}
-                    onBlur={() => handleBlur('hsnCode')}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.hsnCode && addErrors.hsnCode ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
-                  />
-                  {touched.hsnCode && addErrors.hsnCode && (
-                    <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{addErrors.hsnCode}</div>
-                  )}
-                </div>
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Categories (Multi-Select)<span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <SearchableMultiSelect
+                  options={masterCategories}
+                  value={formData.categories}
+                  onChange={(vals) => {
+                    setFormData({ ...formData, categories: vals, category: vals.join(', ') });
+                    handleBlur('category');
+                  }}
+                  placeholder="Search and select master categories..."
+                  labelKey="name"
+                  valueKey="name"
+                  error={touched.category && addErrors.category}
+                />
+                {touched.category && addErrors.category && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{addErrors.category}</div>
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: '10px' }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
-                    Unit (e.g. strips)<span style={{ color: '#ef4444' }}>*</span>
+                    HSN Code<span style={{ color: '#ef4444' }}>*</span>
                   </label>
-                  <input 
-                    type="text"
+                  <SearchableSelect
+                    options={masterHsnCodes}
+                    value={formData.hsnCode}
+                    onChange={(val) => {
+                      setFormData({ ...formData, hsnCode: val });
+                      handleBlur('hsnCode');
+                    }}
+                    placeholder="Select HSN..."
+                    labelKey="code"
+                    valueKey="code"
+                    error={touched.hsnCode && addErrors.hsnCode}
+                  />
+                  {touched.hsnCode && addErrors.hsnCode && (
+                    <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{addErrors.hsnCode}</div>
+                  )}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                    Unit<span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <SearchableSelect
+                    options={masterUnits}
                     value={formData.unit}
-                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    onBlur={() => handleBlur('unit')}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.unit && addErrors.unit ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
+                    onChange={(val) => {
+                      setFormData({ ...formData, unit: val });
+                      handleBlur('unit');
+                    }}
+                    placeholder="Select Unit..."
+                    labelKey="name"
+                    valueKey="name"
+                    error={touched.unit && addErrors.unit}
                   />
                   {touched.unit && addErrors.unit && (
                     <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{addErrors.unit}</div>
                   )}
                 </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
-                    Retail Price (Rs.)<span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <input 
-                    type="text"
-                    inputMode="decimal"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: formatNumberInput(e.target.value, true) })}
-                    onBlur={() => handleBlur('price')}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.price && addErrors.price ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
-                  />
-                  {touched.price && addErrors.price && (
-                    <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{addErrors.price}</div>
-                  )}
-                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '5px' }}>
+                  Retail Price (Rs.)<span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input 
+                  type="text"
+                  inputMode="decimal"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: formatNumberInput(e.target.value, true) })}
+                  onBlur={() => handleBlur('price')}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: touched.price && addErrors.price ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
+                />
+                {touched.price && addErrors.price && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{addErrors.price}</div>
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: '10px' }}>
@@ -675,6 +722,15 @@ export default function Products() {
             </form>
           </div>
         </div>
+      )}
+      {/* Bulk Import Modal */}
+      {showImportModal && (
+        <BulkImportModal
+          moduleName="products"
+          title="Products"
+          onClose={() => setShowImportModal(false)}
+          onSuccess={() => fetchData()}
+        />
       )}
 
     </div>
