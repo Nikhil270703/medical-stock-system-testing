@@ -10,7 +10,7 @@ export default defineConfig({
       name: 'result_analysis',
       filename: 'remoteEntry.js',
       exposes: { './Module': './src/expose.js' },
-      shared: ['react', 'react-dom', 'react-router-dom'],
+      shared: ['react', 'react-dom', 'react-router-dom', 'axios'],
     }),
   ],
   server: {
